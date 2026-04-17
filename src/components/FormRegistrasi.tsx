@@ -41,62 +41,63 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
     linkCloud: "",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => { // <-- Perhatikan tambahan kata 'async' di sini
-  e.preventDefault();
-  if (!canCreate) return;
-// --- 1. MENGIRIM DATA KE SUPABASE ---
-  const { error } = await supabase
-    .from('tabel_arsip') // <-- Sudah diganti jadi tabel_arsip
-    .insert([
-      {
-        kode_klasifikasi: formData.kodeKlasifikasi,
-        nomor_surat: formData.nomorSurat,
-        judul: formData.judul,
-        jenis_naskah: formData.jenisNaskah,
-        klasifikasi_keamanan: formData.klasifikasiKeamanan,
-        tahun: formData.tahun,
-        tanggal_surat: formData.tanggalSurat,
-        deskripsi: formData.deskripsi,
-        retensi_aktif: formData.retensiAktif,
-        retensi_inaktif: formData.retensiInaktif,
-        keterangan_retensi: formData.keteranganRetensi,
-        status_arsip: formData.statusArsip,
-        link_cloud: formData.linkcloud, // <-- Sudah diganti jadi link_cloud
-        registered_by: user?.nama || "Unknown"
-      }
-    ]);
+ const handleSubmit = async (e: React.FormEvent) => { 
+    e.preventDefault();
+    if (!canCreate) return;
 
-  if (error) {
-    console.error("Gagal menyimpan ke database:", error.message);
-    alert("Waduh, gagal registrasi ke database LENTERA. Cek log error.");
-    return; // Berhenti di sini jika gagal, agar form tidak langsung terhapus
-  }
+    // --- 1. MENGIRIM DATA KE SUPABASE ---
+    const { error } = await supabase
+      .from('tabel_arsip') 
+      .insert([
+        {
+          kode_klasifikasi: formData.kodeKlasifikasi,
+          nomor_surat: formData.nomorSurat,
+          judul: formData.judul,
+          jenis_naskah: formData.jenisNaskah,
+          klasifikasi_keamanan: formData.klasifikasiKeamanan,
+          tahun: formData.tahun,
+          tanggal_surat: formData.tanggalSurat,
+          deskripsi: formData.deskripsi,
+          retensi_aktif: formData.retensiAktif,
+          retensi_inaktif: formData.retensiInaktif,
+          keterangan_retensi: formData.keteranganRetensi,
+          status_arsip: formData.statusArsip,
+          link_cloud: formData.linkCloud, // <-- PERBAIKAN: Pakai huruf C besar
+          registered_by: user?.nama || "Unknown"
+        }
+      ]);
 
-  // --- 2. MEMPERBARUI TAMPILAN (Kode bawaan Bapak) ---
-  onSubmit({
-    ...formData,
-    registeredBy: user?.nama || "Unknown",
-  });
+    if (error) {
+      console.error("Gagal menyimpan ke database:", error.message);
+      alert("Waduh, gagal registrasi ke database LENTERA. Cek log error.");
+      return; 
+    }
 
-  // --- 3. MERESET FORMULIR (Kode bawaan Bapak) ---
-  setFormData({
-    kodeKlasifikasi: "",
-    nomorSurat: "",
-    judul: "",
-    jenisNaskah: "",
-    klasifikasiKeamanan: "B",
-    tahun: new Date().getFullYear(),
-    tanggalSurat: new Date().toISOString().split("T")[0],
-    deskripsi: "",
-    retensiAktif: 2,
-    retensiInaktif: 1,
-    keteranganRetensi: "Musnah",
-    statusArsip: "Aktif",
-    linkcloud: "",
-  });
+    // --- 2. MEMPERBARUI TAMPILAN ---
+    onSubmit({
+      ...formData,
+      registeredBy: user?.nama || "Unknown",
+    });
 
-  alert("Mantap! Arsip berhasil diregistrasi ke sistem LENTERA.");
-};
+    // --- 3. MERESET FORMULIR ---
+    setFormData({
+      kodeKlasifikasi: "",
+      nomorSurat: "",
+      judul: "",
+      jenisNaskah: "",
+      klasifikasiKeamanan: "B",
+      tahun: new Date().getFullYear(),
+      tanggalSurat: new Date().toISOString().split("T")[0],
+      deskripsi: "",
+      retensiAktif: 2,
+      retensiInaktif: 1,
+      keteranganRetensi: "Musnah",
+      statusArsip: "Aktif",
+      linkCloud: "", // <-- PERBAIKAN: Pakai huruf C besar
+    });
+
+    alert("Mantap! Arsip berhasil diregistrasi ke sistem LENTERA.");
+  };
 
   // Jika tidak punya akses create, tampilkan pesan
   if (!canCreate) {
