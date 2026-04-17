@@ -44,13 +44,11 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
   const handleSubmit = async (e: React.FormEvent) => { // <-- Perhatikan tambahan kata 'async' di sini
   e.preventDefault();
   if (!canCreate) return;
-
-  // --- 1. MENGIRIM DATA KE SUPABASE ---
+// --- 1. MENGIRIM DATA KE SUPABASE ---
   const { error } = await supabase
-    .from('arsip') // GANTI dengan nama tabel asli Bapak di Supabase (misal: 'arsip' atau 'tabel_arsip')
+    .from('tabel_arsip') // <-- Sudah diganti jadi tabel_arsip
     .insert([
       {
-        // Kiri: Nama kolom di Supabase | Kanan: Data dari form LENTERA
         kode_klasifikasi: formData.kodeKlasifikasi,
         nomor_surat: formData.nomorSurat,
         judul: formData.judul,
@@ -63,7 +61,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
         retensi_inaktif: formData.retensiInaktif,
         keterangan_retensi: formData.keteranganRetensi,
         status_arsip: formData.statusArsip,
-        linkcloud: formData.linkcloud,
+        link_cloud: formData.linkcloud, // <-- Sudah diganti jadi link_cloud
         registered_by: user?.nama || "Unknown"
       }
     ]);
