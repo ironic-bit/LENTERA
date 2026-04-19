@@ -44,8 +44,8 @@ export const DEFAULT_USERS: User[] = [
   },
 ];
 
-// Password untuk demo (dalam produksi harus di-hash)
-export const USER_PASSWORDS: Record<string, string> = {
+// Default Password untuk demo (dalam produksi harus di-hash)
+export const DEFAULT_USER_PASSWORDS: Record<string, string> = {
   admin: "admin123",
   pegawai: "pegawai123",
   viewer: "viewer123",
