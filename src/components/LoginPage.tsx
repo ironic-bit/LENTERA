@@ -29,9 +29,9 @@ export function LoginPage() {
   };
 
   const demoAccounts = [
-    { role: "Admin", username: "admin", password: "admin123", desc: "Akses penuh" },
-    { role: "User", username: "pegawai", password: "pegawai123", desc: "View, Create, Edit" },
-    { role: "Viewer", username: "viewer", password: "viewer123", desc: "View only" },
+    { role: "Admin", username: "admin", password: "admin123", desc: "Akses penuh", longDesc: "Memiliki kontrol penuh atas seluruh sistem, termasuk manajemen pengguna, pengaturan aplikasi, dan persetujuan akhir arsip." },
+    { role: "User", username: "pegawai", password: "pegawai123", desc: "View, Create, Edit", longDesc: "Dapat membuat, mengedit, dan mengelola arsip harian. Cocok untuk staf yang menangani dokumen secara langsung." },
+    { role: "Viewer", username: "viewer", password: "viewer123", desc: "View only", longDesc: "Hanya dapat melihat dan mencari arsip yang sudah disetujui. Tidak memiliki akses untuk mengubah atau menghapus data." },
   ];
 
   return (
@@ -188,6 +188,9 @@ export function LoginPage() {
                           {account.desc}
                         </Badge>
                       </div>
+                      <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+                        {account.longDesc}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
