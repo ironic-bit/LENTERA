@@ -82,10 +82,18 @@ function AppContent() {
     );
   }
 
-  // Dashboard view
+  // If we reach here and are not authenticated (e.g. after logout), redirect to homepage/login
+  if (!isAuthenticated) {
+    if (view !== "homepage" && view !== "login") {
+      setView("login");
+    }
+    // Render nothing while state updates
+    return null;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <Header onViewChange={setView} />
+      <Header onViewChange={(v: string) => setView(v as AppView)} />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {view === "manajemen_user" && userRole === "admin" ? (

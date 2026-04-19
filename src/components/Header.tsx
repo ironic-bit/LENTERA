@@ -1,7 +1,7 @@
 import { Database } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 
-export function Header({ onViewChange }: { onViewChange?: (view: any) => void }) {
+export function Header({ onViewChange }: { onViewChange?: (view: string) => void }) {
   return (
     <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-lg border-b border-amber-500/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

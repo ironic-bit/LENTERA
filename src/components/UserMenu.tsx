@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { User, LogOut, Shield, UserCircle, Users, Eye, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export function UserMenu({ onViewChange }: { onViewChange?: (view: any) => void }) {
+export function UserMenu({ onViewChange }: { onViewChange?: (view: string) => void }) {
   const { user, logout, userRole } = useAuth();
 
   if (!user) return null;
