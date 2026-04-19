@@ -149,11 +149,7 @@ export function LoginPage() {
             {demoAccounts.map((account, index) => (
               <Card
                 key={index}
-                className="border-0 shadow-lg bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 hover:border-amber-500/30 transition-all cursor-pointer group"
-                onClick={() => {
-                  setUsername(account.username);
-                  setPassword(account.password);
-                }}
+                className="border-0 shadow-lg bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 transition-all"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
@@ -193,22 +189,10 @@ export function LoginPage() {
                         </Badge>
                       </div>
                     </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-amber-400 font-medium">
-                        Klik untuk isi
-                      </span>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
-          </div>
-
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-            <p className="text-sm text-amber-300">
-              <strong>💡 Tips:</strong> Klik salah satu kartu di atas untuk mengisi otomatis username dan password. 
-              Setiap role memiliki hak akses yang berbeda terhadap data arsip.
-            </p>
           </div>
         </div>
       </div>
