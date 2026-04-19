@@ -192,10 +192,6 @@ export function LoginPage() {
                           {account.desc}
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-400">
-                        Username: <span className="font-mono text-slate-300">{account.username}</span> | 
-                        Password: <span className="font-mono text-slate-300">{account.password}</span>
-                      </p>
                     </div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-xs text-amber-400 font-medium">
