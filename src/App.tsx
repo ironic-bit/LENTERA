@@ -62,6 +62,12 @@ function AppContent() {
     );
   }
 
+  // Ensure that if we are authenticated, we don't accidentally stay stuck on a 'login' or 'homepage' view internally
+  if (isAuthenticated && (view === "login" || view === "homepage")) {
+    setView("dashboard");
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">

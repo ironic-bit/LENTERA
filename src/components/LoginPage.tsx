@@ -23,6 +23,9 @@ export function LoginPage() {
     const success = await login(username, password);
     if (!success) {
       setError("Username atau password salah!");
+    } else {
+      // Refresh the page or force a view update if needed, but the App.tsx already handles isAuthenticated.
+      // However, the view might still be "login" so let's trigger something or let App component react to isAuthenticated.
     }
 
     setIsLoading(false);
