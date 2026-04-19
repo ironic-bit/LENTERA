@@ -71,7 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const expectedPassword = passwords[username.toLowerCase()];
+    // Support case-sensitive password but case-insensitive username lookup
+    const expectedPassword = passwords[username.toLowerCase()] || passwords[username];
     const foundUser = users.find(
       (u) => u.username.toLowerCase() === username.toLowerCase()
     );
