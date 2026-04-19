@@ -8,10 +8,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
-import { User, LogOut, Shield, UserCircle, Users, Eye } from "lucide-react";
+import { User, LogOut, Shield, UserCircle, Users, Eye, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export function UserMenu() {
+export function UserMenu({ onViewChange }: { onViewChange?: (view: any) => void }) {
   const { user, logout, userRole } = useAuth();
 
   if (!user) return null;
@@ -71,6 +71,17 @@ export function UserMenu() {
             </Badge>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {userRole === "admin" && (
+          <DropdownMenuItem onClick={() => onViewChange && onViewChange("manajemen_user")} className="cursor-pointer">
+            <Users className="w-4 h-4 mr-2" />
+            Manajemen User
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onViewChange && onViewChange("dashboard")} className="cursor-pointer">
+          <Database className="w-4 h-4 mr-2" />
+          Dashboard Arsip
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer">
           <LogOut className="w-4 h-4 mr-2" />

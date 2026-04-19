@@ -12,9 +12,9 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FormInput, List, Users } from "lucide-react";
+import { FormInput, List } from "lucide-react";
 
-type AppView = "homepage" | "login" | "dashboard";
+type AppView = "homepage" | "login" | "dashboard" | "manajemen_user";
 
 function AppContent() {
   const [view, setView] = useState<AppView>("homepage");
@@ -85,72 +85,66 @@ function AppContent() {
   // Dashboard view
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <Header />
+      <Header onViewChange={setView} />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        {/* Statistik */}
-        <div className="mb-8">
-          <StatistikArsip arsipList={arsipList} />
-        </div>
+        {view === "manajemen_user" && userRole === "admin" ? (
+          <ManajemenUser />
+        ) : (
+          <>
+            {/* Statistik */}
+            <div className="mb-8">
+              <StatistikArsip arsipList={arsipList} />
+            </div>
 
-        {/* Layout Utama dengan Tabs */}
-        <Tabs defaultValue="arsip" className="space-y-6">
-          <TabsList className={`grid w-full bg-white border border-slate-200 p-1 ${userRole === 'admin' ? 'grid-cols-2 max-w-md' : 'grid-cols-1 max-w-[200px]'}`}>
-            <TabsTrigger value="arsip" className="flex items-center gap-2">
-              <List className="w-4 h-4" />
-              <span>Sistem Arsip</span>
-            </TabsTrigger>
-            {userRole === "admin" && (
-              <TabsTrigger value="pengguna" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span>Manajemen User</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          <TabsContent value="arsip" className="space-y-6">
-            <Tabs defaultValue="daftar" className="space-y-6 lg:hidden">
-              <TabsList className="grid w-full grid-cols-2 bg-white border border-slate-200 p-1">
-                <TabsTrigger value="daftar" className="flex items-center gap-2">
+            {/* Layout Utama dengan Tabs */}
+            <Tabs defaultValue="arsip" className="space-y-6">
+              <TabsList className="grid w-full bg-white border border-slate-200 p-1 grid-cols-1 max-w-[200px]">
+                <TabsTrigger value="arsip" className="flex items-center gap-2">
                   <List className="w-4 h-4" />
-                  <span className="hidden sm:inline">Daftar Arsip</span>
-                  <span className="sm:hidden">Daftar</span>
-                </TabsTrigger>
-                <TabsTrigger value="registrasi" className="flex items-center gap-2">
-                  <FormInput className="w-4 h-4" />
-                  <span className="hidden sm:inline">Registrasi Baru</span>
-                  <span className="sm:hidden">Registrasi</span>
+                  <span>Sistem Arsip</span>
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="daftar" className="space-y-6">
-                <DaftarArsip arsipList={arsipList} onDelete={handleDeleteArsip} />
-              </TabsContent>
+              <TabsContent value="arsip" className="space-y-6">
+                <Tabs defaultValue="daftar" className="space-y-6 lg:hidden">
+                  <TabsList className="grid w-full grid-cols-2 bg-white border border-slate-200 p-1">
+                    <TabsTrigger value="daftar" className="flex items-center gap-2">
+                      <List className="w-4 h-4" />
+                      <span className="hidden sm:inline">Daftar Arsip</span>
+                      <span className="sm:hidden">Daftar</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="registrasi" className="flex items-center gap-2">
+                      <FormInput className="w-4 h-4" />
+                      <span className="hidden sm:inline">Registrasi Baru</span>
+                      <span className="sm:hidden">Registrasi</span>
+                    </TabsTrigger>
+                  </TabsList>
 
-              <TabsContent value="registrasi" className="space-y-6">
-                <div className="max-w-2xl mx-auto">
-                  <FormRegistrasi onSubmit={handleAddArsip} />
+                  <TabsContent value="daftar" className="space-y-6">
+                    <DaftarArsip arsipList={arsipList} onDelete={handleDeleteArsip} />
+                  </TabsContent>
+
+                  <TabsContent value="registrasi" className="space-y-6">
+                    <div className="max-w-2xl mx-auto">
+                      <FormRegistrasi onSubmit={handleAddArsip} />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                {/* Desktop Layout - Side by Side */}
+                <div className="hidden lg:grid lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-1">
+                    <FormRegistrasi onSubmit={handleAddArsip} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <DaftarArsip arsipList={arsipList} onDelete={handleDeleteArsip} />
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
-
-            {/* Desktop Layout - Side by Side */}
-            <div className="hidden lg:grid lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1">
-                <FormRegistrasi onSubmit={handleAddArsip} />
-              </div>
-              <div className="lg:col-span-2">
-                <DaftarArsip arsipList={arsipList} onDelete={handleDeleteArsip} />
-              </div>
-            </div>
-          </TabsContent>
-
-          {userRole === "admin" && (
-            <TabsContent value="pengguna" className="space-y-6">
-              <ManajemenUser />
-            </TabsContent>
-          )}
-        </Tabs>
+          </>
+        )}
       </main>
 
       <Footer />

@@ -5,18 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import type { UserRole } from "@/types/auth";
-import { ShieldAlert, Users, PlusCircle } from "lucide-react";
+import type { UserRole, AksesKlasifikasi } from "@/types/auth";
+import { ShieldAlert, Users, PlusCircle, Trash2 } from "lucide-react";
 
 export function ManajemenUser() {
-  const { userRole, users, addUser } = useAuth();
+  const { user, userRole, users, addUser, deleteUser } = useAuth();
 
   const [username, setUsername] = useState("");
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("user");
+  const [akses, setAkses] = useState<AksesKlasifikasi[]>(["B"]);
 
   if (userRole !== "admin") {
     return (
@@ -40,7 +42,8 @@ export function ManajemenUser() {
       nama,
       email,
       role,
-      password
+      password,
+      aksesKlasifikasi: akses
     });
 
     if (success) {
@@ -51,8 +54,27 @@ export function ManajemenUser() {
       setEmail("");
       setPassword("");
       setRole("user");
+      setAkses(["B"]);
     } else {
       toast.error("Gagal menambahkan", { description: `Username ${username} sudah digunakan.` });
+    }
+  };
+
+  const handleToggleAkses = (klasifikasi: AksesKlasifikasi) => {
+    setAkses(prev =>
+      prev.includes(klasifikasi)
+        ? prev.filter(k => k !== klasifikasi)
+        : [...prev, klasifikasi]
+    );
+  };
+
+  const handleDelete = (id: string, namaUser: string) => {
+    if (confirm(`Apakah Anda yakin ingin menghapus user ${namaUser}?`)) {
+      if (deleteUser(id)) {
+        toast.success("User dihapus", { description: `User ${namaUser} berhasil dihapus.` });
+      } else {
+        toast.error("Gagal menghapus", { description: "Terjadi kesalahan atau Anda mencoba menghapus akun Anda sendiri." });
+      }
     }
   };
 
@@ -119,10 +141,10 @@ export function ManajemenUser() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role">Hak Akses (Role)</Label>
+                  <Label htmlFor="role">Role Pengguna</Label>
                   <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih hak akses" />
+                      <SelectValue placeholder="Pilih role" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin - Akses Penuh</SelectItem>
@@ -130,6 +152,35 @@ export function ManajemenUser() {
                       <SelectItem value="viewer">Viewer - Read Only</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-3 pt-2 pb-2">
+                  <Label>Hak Akses Arsip (Klasifikasi Keamanan)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "B", label: "Biasa (B)" },
+                      { id: "T", label: "Terbatas (T)" },
+                      { id: "R", label: "Rahasia (R)" },
+                      { id: "SR", label: "Sangat Rahasia (SR)" }
+                    ].map((item) => (
+                      <div key={item.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`akses-${item.id}`}
+                          checked={akses.includes(item.id as AksesKlasifikasi)}
+                          onCheckedChange={() => handleToggleAkses(item.id as AksesKlasifikasi)}
+                        />
+                        <label
+                          htmlFor={`akses-${item.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {item.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Pilih tingkat keamanan arsip yang dapat dilihat oleh user ini.
+                  </p>
                 </div>
 
                 <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
@@ -156,8 +207,9 @@ export function ManajemenUser() {
                     <tr>
                       <th className="px-4 py-3">Nama Lengkap</th>
                       <th className="px-4 py-3">Username</th>
-                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3 text-center">Akses Arsip</th>
                       <th className="px-4 py-3 text-center">Role</th>
+                      <th className="px-4 py-3 text-center">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -165,7 +217,20 @@ export function ManajemenUser() {
                       <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/50">
                         <td className="px-4 py-3 font-medium text-slate-900">{u.nama}</td>
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{u.username}</td>
-                        <td className="px-4 py-3 text-slate-500">{u.email || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center gap-1 flex-wrap">
+                            {u.aksesKlasifikasi?.map(ak => (
+                              <span key={ak} className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                ak === 'SR' ? 'bg-red-100 text-red-800' :
+                                ak === 'R' ? 'bg-orange-100 text-orange-800' :
+                                ak === 'T' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {ak}
+                              </span>
+                            )) || <span className="text-xs text-slate-400">-</span>}
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
                             u.role === 'admin' ? 'bg-amber-100 text-amber-800' :
@@ -175,11 +240,23 @@ export function ManajemenUser() {
                             {u.role.toUpperCase()}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDelete(u.id, u.nama)}
+                            disabled={user?.id === u.id}
+                            title={user?.id === u.id ? "Tidak dapat menghapus akun sendiri" : "Hapus User"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                     {(!users || users.length === 0) && (
                       <tr>
-                        <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
                           Tidak ada pengguna ditemukan.
                         </td>
                       </tr>

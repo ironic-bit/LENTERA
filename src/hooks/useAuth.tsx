@@ -16,6 +16,7 @@ interface AuthContextType {
   hasAccess: (permission: string) => boolean;
   userRole: UserRole | null;
   addUser: (userData: Omit<User, "id"> & { password?: string }) => boolean;
+  deleteUser: (id: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       nama: userData.nama,
       role: userData.role,
       email: userData.email,
+      aksesKlasifikasi: userData.aksesKlasifikasi || ["B"],
     };
 
     const newUsers = [...users, newUser];
@@ -106,6 +108,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return true;
   }, [users, passwords]);
+
+  const deleteUser = useCallback((id: string): boolean => {
+    // Prevent deleting self
+    if (user?.id === id) return false;
+
+    // Check if user exists
+    const userToDelete = users.find(u => u.id === id);
+    if (!userToDelete) return false;
+
+    const newUsers = users.filter(u => u.id !== id);
+
+    // We could remove password from passwords object too but since username is key,
+    // it's not strictly necessary unless we want to clean up.
+    // Let's clean it up:
+    const newPasswords = { ...passwords };
+    delete newPasswords[userToDelete.username.toLowerCase()];
+
+    setUsers(newUsers);
+    setPasswords(newPasswords);
+
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(newUsers));
+    localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(newPasswords));
+
+    return true;
+  }, [users, passwords, user]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -130,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasAccess,
     userRole: user?.role || null,
     addUser,
+    deleteUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
