@@ -38,7 +38,7 @@ interface DaftarArsipProps {
 }
 
 export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
-  const { hasAccess, userRole } = useAuth();
+  const { hasAccess, userRole, user } = useAuth();
   const canDelete = hasAccess("delete");
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,21 +52,14 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
     return years.sort((a, b) => b - a);
   }, [arsipList]);
 
+  // Default to ["B"] to ensure hook dependency stability without causing infinite loop.
+  const aksesKlasifikasi = useMemo(() => user?.aksesKlasifikasi || (userRole === "admin" ? ["B", "T", "R", "SR"] : ["B"]), [user?.aksesKlasifikasi, userRole]);
+
   // Filter data based on user access level
   const filteredArsip = useMemo(() => {
     return arsipList.filter((arsip) => {
-      // Security filtering based on user role
-      const keamananLevel = arsip.klasifikasiKeamanan;
-      let canView = true;
-      
-      if (userRole === "viewer") {
-        // Viewer hanya bisa lihat Biasa (B) dan Terbatas (T)
-        canView = keamananLevel === "B" || keamananLevel === "T";
-      } else if (userRole === "user") {
-        // User bisa lihat B, T, dan Rahasia (R)
-        canView = keamananLevel === "B" || keamananLevel === "T" || keamananLevel === "R";
-      }
-      // Admin bisa lihat semua termasuk Sangat Rahasia (SR)
+      // Security filtering based on user's assigned classifications
+      const canView = aksesKlasifikasi.includes(arsip.klasifikasiKeamanan as "B" | "T" | "R" | "SR");
 
       const matchSearch =
         searchQuery === "" ||
@@ -86,7 +79,7 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
 
       return canView && matchSearch && matchKeamanan && matchStatus && matchTahun;
     });
-  }, [arsipList, searchQuery, filterKeamanan, filterStatus, filterTahun, userRole]);
+  }, [arsipList, searchQuery, filterKeamanan, filterStatus, filterTahun, aksesKlasifikasi]);
 
   const getKeamananColor = (keamanan: string) => {
     return KLASIFIKASI_KEAMANAN.find((k) => k.value === keamanan)?.color || "bg-slate-100";

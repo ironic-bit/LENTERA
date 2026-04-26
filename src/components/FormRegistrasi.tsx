@@ -10,12 +10,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Cloud, Lock, Shield, FileText } from "lucide-react";
+import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
   onSubmit: (arsip: Omit<Arsip, "id" | "tanggalRegistrasi">) => void;
@@ -24,6 +38,7 @@ interface FormRegistrasiProps {
 export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
   const { hasAccess, user } = useAuth();
   const canCreate = hasAccess("create");
+  const [openKlasifikasi, setOpenKlasifikasi] = useState(false);
 
   const [formData, setFormData] = useState({
     kodeKlasifikasi: "",
@@ -142,26 +157,60 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Kode Klasifikasi */}
-          <div className="space-y-2">
+          <div className="space-y-2 flex flex-col">
             <Label htmlFor="kodeKlasifikasi" className="text-slate-700 font-medium">
               Kode Klasifikasi <span className="text-red-500">*</span>
               <span className="text-xs text-slate-500 font-normal ml-2">(Perwako 49/2022)</span>
             </Label>
-            <Select
-              value={formData.kodeKlasifikasi}
-              onValueChange={(value) => setFormData({ ...formData, kodeKlasifikasi: value })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="Pilih kode klasifikasi" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {KODE_KLASIFIKASI.map((kode) => (
-                  <SelectItem key={kode.kode} value={kode.kode}>
-                    <span className="font-mono text-blue-600">{kode.kode}</span> - {kode.nama}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={openKlasifikasi} onOpenChange={setOpenKlasifikasi}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openKlasifikasi}
+                  className="justify-between border-slate-300 focus:border-blue-500 focus:ring-blue-500 font-normal"
+                >
+                  {formData.kodeKlasifikasi
+                    ? (
+                      <span className="truncate">
+                        <span className="font-mono text-blue-600 mr-2">{formData.kodeKlasifikasi}</span>
+                        {KODE_KLASIFIKASI.find((k) => k.kode === formData.kodeKlasifikasi)?.nama}
+                      </span>
+                    )
+                    : "Cari atau pilih kode klasifikasi..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Cari kode atau nama klasifikasi..." className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>Kode klasifikasi tidak ditemukan.</CommandEmpty>
+                    <CommandGroup>
+                      {KODE_KLASIFIKASI.map((kode) => (
+                        <CommandItem
+                          key={kode.kode}
+                          value={`${kode.kode} ${kode.nama}`}
+                          onSelect={() => {
+                            setFormData({ ...formData, kodeKlasifikasi: kode.kode });
+                            setOpenKlasifikasi(false);
+                          }}
+                        >
+                          <span className="font-mono text-blue-600 w-24 shrink-0">{kode.kode}</span>
+                          <span className="truncate">{kode.nama}</span>
+                          <Check
+                            className={cn(
+                              "ml-auto h-4 w-4",
+                              formData.kodeKlasifikasi === kode.kode ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Nomor Surat */}
