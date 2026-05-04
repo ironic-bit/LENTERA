@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import type { UserRole, AksesKlasifikasi, User } from "@/types/auth";
-import { ShieldAlert, Users, PlusCircle, Trash2, Edit, X } from "lucide-react";
+import { ShieldAlert, Users, PlusCircle, Trash2, Edit, UserCheck, UserX } from "lucide-react";
 
 export function ManajemenUser() {
   const { user, userRole, users, addUser, deleteUser, updateUser } = useAuth();
@@ -59,18 +59,19 @@ export function ManajemenUser() {
     setStatusAktif(u.statusAktif ?? true);
   };
 
-  const handleToggleStatus = (u: User) => {
+  const handleToggleStatus = async (u: User) => {
     if (user?.id === u.id) {
       toast.error("Gagal", { description: "Anda tidak dapat menonaktifkan akun Anda sendiri." });
       return;
     }
     const newStatus = !(u.statusAktif ?? true);
-    if (updateUser(u.id, { statusAktif: newStatus })) {
+    const success = await updateUser(u.id, { statusAktif: newStatus });
+    if (success) {
       toast.success("Status diperbarui", { description: `User ${u.nama} sekarang ${newStatus ? 'Aktif' : 'Inaktif'}.` });
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !nama) {
       toast.error("Gagal", { description: "Username dan Nama wajib diisi." });
@@ -88,7 +89,8 @@ export function ManajemenUser() {
       };
       if (password) updateData.password = password; // Only update if provided
 
-      if (updateUser(editingId, updateData)) {
+      const success = await updateUser(editingId, updateData);
+      if (success) {
         toast.success("User diperbarui", { description: `Data user ${username} berhasil disimpan.` });
         resetForm();
       } else {
@@ -339,12 +341,12 @@ export function ManajemenUser() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 ${u.statusAktif === false ? 'text-green-500 hover:text-green-700 hover:bg-green-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                            className={`h-8 w-8 ${u.statusAktif === false ? 'text-green-500 hover:text-green-700 hover:bg-green-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                             onClick={() => handleToggleStatus(u)}
                             disabled={user?.id === u.id}
                             title={user?.id === u.id ? "Tidak dapat menonaktifkan akun sendiri" : (u.statusAktif === false ? "Aktifkan User" : "Nonaktifkan User")}
                           >
-                            <X className="h-4 w-4" />
+                            {u.statusAktif === false ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
                           </Button>
                           <Button
                             variant="ghost"

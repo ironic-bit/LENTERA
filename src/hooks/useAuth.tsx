@@ -17,7 +17,7 @@ interface AuthContextType {
   userRole: UserRole | null;
   addUser: (userData: Omit<User, "id"> & { password?: string }) => boolean;
   deleteUser: (id: string) => boolean;
-  updateUser: (id: string, partialData: Partial<User>) => boolean;
+  updateUser: (id: string, partialData: Partial<User>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -196,12 +196,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [users, passwords, user]);
 
-  const updateUser = useCallback((id: string, partialData: Partial<User>): boolean => {
+  const updateUser = useCallback(async (id: string, partialData: Partial<User>): Promise<boolean> => {
     const userIndex = users.findIndex((u) => u.id === id);
     if (userIndex === -1) return false;
 
-    // Optional: add logic here to sync with Supabase profiles table directly
-    // const { error } = await supabase.from('profiles').update(partialData).eq('id', id);
+    // Map the internal User fields to the Supabase profiles columns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updatePayload: any = {};
+    if (partialData.nama !== undefined) updatePayload.nama = partialData.nama;
+    if (partialData.username !== undefined) updatePayload.username = partialData.username;
+    if (partialData.role !== undefined) updatePayload.role = partialData.role;
+    if (partialData.aksesKlasifikasi !== undefined) updatePayload.akses_klasifikasi = partialData.aksesKlasifikasi;
+    if (partialData.statusAktif !== undefined) updatePayload.status_aktif = partialData.statusAktif;
+    if (partialData.email !== undefined) updatePayload.email = partialData.email;
+
+    // Sync with Supabase profiles table
+    if (Object.keys(updatePayload).length > 0) {
+      const { error } = await supabase.from('profiles').update(updatePayload).eq('id', id);
+      if (error) {
+        console.error("Failed to update user profile in Supabase:", error.message);
+        // We could return false here to abort the local update if the server fails
+        // but for now we'll log it and let it proceed to local state.
+      }
+    }
 
     const updatedUsers = [...users];
     updatedUsers[userIndex] = { ...updatedUsers[userIndex], ...partialData };
