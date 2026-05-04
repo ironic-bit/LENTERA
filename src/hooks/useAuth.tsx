@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import type { User, UserRole, AksesKlasifikasi } from "@/types/auth";
-import { DEFAULT_USERS, DEFAULT_USER_PASSWORDS, hasPermission } from "@/types/auth";
+import { DEFAULT_USERS, hasPermission } from "@/types/auth";
 import { supabase } from "@/supabaseClient";
 
 const USERS_STORAGE_KEY = "arsip-users-data";
-const PASSWORDS_STORAGE_KEY = "arsip-passwords-data";
 
 interface AuthContextType {
   user: User | null;
@@ -15,7 +14,7 @@ interface AuthContextType {
   logout: () => void;
   hasAccess: (permission: string) => boolean;
   userRole: UserRole | null;
-  addUser: (userData: Omit<User, "id"> & { password?: string }) => boolean;
+  addUser: (userData: Omit<User, "id"> & { password?: string }) => Promise<boolean>;
   deleteUser: (id: string) => boolean;
   updateUser: (id: string, partialData: Partial<User>) => Promise<boolean>;
 }
@@ -25,27 +24,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>(DEFAULT_USERS);
-  const [passwords, setPasswords] = useState<Record<string, string>>(DEFAULT_USER_PASSWORDS);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load existing users data and session on mount
   useEffect(() => {
-    // Local storage logic (Fallback for demo accounts)
-    try {
-      const storedUsers = localStorage.getItem(USERS_STORAGE_KEY);
-      const storedPasswords = localStorage.getItem(PASSWORDS_STORAGE_KEY);
-
-      if (storedUsers && storedPasswords) {
-        setUsers(JSON.parse(storedUsers));
-        setPasswords(JSON.parse(storedPasswords));
-      } else {
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
-        localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(DEFAULT_USER_PASSWORDS));
+    // Fetch real users from public.profiles
+    const fetchRealUsers = async () => {
+      const { data: profiles, error } = await supabase.from('profiles').select('*');
+      if (profiles && !error) {
+        const mappedUsers: User[] = profiles.map(p => ({
+          id: p.id,
+          username: p.username || p.email?.split('@')[0] || "user",
+          nama: p.nama || "User",
+          role: (p.role as UserRole) || "viewer",
+          email: p.email,
+          aksesKlasifikasi: p.akses_klasifikasi || ["B"],
+          statusAktif: p.status_aktif ?? true,
+        }));
+        setUsers(mappedUsers);
       }
-    } catch {
-      setUsers(DEFAULT_USERS);
-      setPasswords(DEFAULT_USER_PASSWORDS);
-    }
+    };
+
+    fetchRealUsers();
 
     // Supabase Auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -109,18 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .limit(1);
 
       if (error || !profiles || profiles.length === 0) {
-        // If not found in Supabase, fallback to local demo accounts if you still want them to work
-        const expectedPassword = passwords[identifier.toLowerCase()] || passwords[identifier];
-        const foundUser = users.find(
-          (u) => u.username.toLowerCase() === identifier.toLowerCase()
-        );
-
-        if (foundUser && expectedPassword === password) {
-          setUser(foundUser);
-          setIsLoading(false);
-          return true;
-        }
-
+        // If not found in Supabase, we can no longer fallback to dummy passwords as we removed the dummy password state.
         setIsLoading(false);
         return false;
       }
@@ -142,59 +131,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return true;
-  }, [users, passwords]);
+  }, []);
 
-  const addUser = useCallback((userData: Omit<User, "id"> & { password?: string }): boolean => {
-    if (users.some(u => u.username.toLowerCase() === userData.username.toLowerCase())) {
-      return false; // Username already exists
+  const addUser = useCallback(async (userData: Omit<User, "id"> & { password?: string }): Promise<boolean> => {
+    // We invoke the Supabase Edge Function to create the user safely without logging out the admin
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: {
+        email: userData.email,
+        password: userData.password || "password123",
+        username: userData.username,
+        nama: userData.nama,
+        role: userData.role,
+        aksesKlasifikasi: userData.aksesKlasifikasi || ["B"],
+        statusAktif: userData.statusAktif ?? true,
+      }
+    });
+
+    if (error || !data?.success) {
+      console.error("Failed to add user via edge function:", error?.message || data?.error);
+      return false;
     }
 
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      username: userData.username,
-      nama: userData.nama,
-      role: userData.role,
-      email: userData.email,
-      aksesKlasifikasi: userData.aksesKlasifikasi || ["B"],
-      statusAktif: userData.statusAktif ?? true,
-    };
-
-    const newUsers = [...users, newUser];
-    const newPasswords = { ...passwords, [userData.username.toLowerCase()]: userData.password || "password123" };
-
-    setUsers(newUsers);
-    setPasswords(newPasswords);
-
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(newUsers));
-    localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(newPasswords));
+    // After successful creation via Edge Function, the user data will be in our database.
+    // Fetch the updated users list from the database
+    const { data: updatedProfiles } = await supabase.from('profiles').select('*');
+    if (updatedProfiles) {
+      const mappedUsers: User[] = updatedProfiles.map(p => ({
+        id: p.id,
+        username: p.username || p.email?.split('@')[0] || "user",
+        nama: p.nama || "User",
+        role: (p.role as UserRole) || "viewer",
+        email: p.email,
+        aksesKlasifikasi: p.akses_klasifikasi || ["B"],
+        statusAktif: p.status_aktif ?? true,
+      }));
+      setUsers(mappedUsers);
+    }
 
     return true;
-  }, [users, passwords]);
+  }, []);
 
   const deleteUser = useCallback((id: string): boolean => {
     // Prevent deleting self
     if (user?.id === id) return false;
 
-    // Check if user exists
-    const userToDelete = users.find(u => u.id === id);
-    if (!userToDelete) return false;
+    // Deleting from auth.users via frontend is not permitted natively without an edge function.
+    // For now we will hide them or you would use another Edge Function to delete them entirely.
+    // To implement real deletion you would need another edge function.
+    // For now, let's keep the existing local logic or just toggle status in real app.
 
     const newUsers = users.filter(u => u.id !== id);
-
-    // We could remove password from passwords object too but since username is key,
-    // it's not strictly necessary unless we want to clean up.
-    // Let's clean it up:
-    const newPasswords = { ...passwords };
-    delete newPasswords[userToDelete.username.toLowerCase()];
-
     setUsers(newUsers);
-    setPasswords(newPasswords);
-
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(newUsers));
-    localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(newPasswords));
 
     return true;
-  }, [users, passwords, user]);
+  }, [users, user]);
 
   const updateUser = useCallback(async (id: string, partialData: Partial<User>): Promise<boolean> => {
     const userIndex = users.findIndex((u) => u.id === id);

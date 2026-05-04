@@ -102,7 +102,7 @@ export function ManajemenUser() {
         return;
       }
 
-      const success = addUser({
+      const success = await addUser({
         username,
         nama,
         email,
@@ -116,7 +116,7 @@ export function ManajemenUser() {
         toast.success("User ditambahkan", { description: `User ${username} berhasil dibuat.` });
         resetForm();
       } else {
-        toast.error("Gagal menambahkan", { description: `Username ${username} sudah digunakan.` });
+        toast.error("Gagal menambahkan", { description: `Username atau email mungkin sudah digunakan, atau Edge Function gagal.` });
       }
     }
   };
