@@ -9,6 +9,7 @@ export interface User {
   role: UserRole;
   email?: string;
   aksesKlasifikasi?: AksesKlasifikasi[];
+  statusAktif?: boolean;
 }
 
 export interface AuthState {
@@ -31,6 +32,7 @@ export const DEFAULT_USERS: User[] = [
     role: "admin",
     email: "admin@instansi.go.id",
     aksesKlasifikasi: ["B", "T", "R", "SR"],
+    statusAktif: true,
   },
   {
     id: "2",
@@ -39,6 +41,7 @@ export const DEFAULT_USERS: User[] = [
     role: "user",
     email: "pegawai@instansi.go.id",
     aksesKlasifikasi: ["B"],
+    statusAktif: true,
   },
   {
     id: "3",
@@ -47,6 +50,7 @@ export const DEFAULT_USERS: User[] = [
     role: "viewer",
     email: "viewer@instansi.go.id",
     aksesKlasifikasi: ["B"],
+    statusAktif: true,
   },
 ];
 

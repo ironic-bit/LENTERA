@@ -69,13 +69,13 @@ export function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-slate-300 font-medium">
-                  Username
+                  Username / NIP / Email
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <Input
                     id="username"
-                    placeholder="Masukkan username"
+                    placeholder="Masukkan email, username, atau NIP"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="pl-10 h-12 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500"

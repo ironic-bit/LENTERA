@@ -6,12 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import type { UserRole, AksesKlasifikasi } from "@/types/auth";
-import { ShieldAlert, Users, PlusCircle, Trash2 } from "lucide-react";
+import type { UserRole, AksesKlasifikasi, User } from "@/types/auth";
+import { ShieldAlert, Users, PlusCircle, Trash2, Edit, X } from "lucide-react";
 
 export function ManajemenUser() {
-  const { user, userRole, users, addUser, deleteUser } = useAuth();
+  const { user, userRole, users, addUser, deleteUser, updateUser } = useAuth();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [username, setUsername] = useState("");
   const [nama, setNama] = useState("");
@@ -19,6 +23,7 @@ export function ManajemenUser() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("user");
   const [akses, setAkses] = useState<AksesKlasifikasi[]>(["B"]);
+  const [statusAktif, setStatusAktif] = useState(true);
 
   if (userRole !== "admin") {
     return (
@@ -30,33 +35,87 @@ export function ManajemenUser() {
     );
   }
 
+  const resetForm = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setUsername("");
+    setNama("");
+    setEmail("");
+    setPassword("");
+    setRole("user");
+    setAkses(["B"]);
+    setStatusAktif(true);
+  };
+
+  const handleEditClick = (u: User) => {
+    setIsEditing(true);
+    setEditingId(u.id);
+    setUsername(u.username);
+    setNama(u.nama);
+    setEmail(u.email || "");
+    setPassword(""); // Leave empty unless changing
+    setRole(u.role);
+    setAkses(u.aksesKlasifikasi || ["B"]);
+    setStatusAktif(u.statusAktif ?? true);
+  };
+
+  const handleToggleStatus = (u: User) => {
+    if (user?.id === u.id) {
+      toast.error("Gagal", { description: "Anda tidak dapat menonaktifkan akun Anda sendiri." });
+      return;
+    }
+    const newStatus = !(u.statusAktif ?? true);
+    if (updateUser(u.id, { statusAktif: newStatus })) {
+      toast.success("Status diperbarui", { description: `User ${u.nama} sekarang ${newStatus ? 'Aktif' : 'Inaktif'}.` });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !nama || !password) {
-      toast.error("Gagal menambahkan", { description: "Username, Nama, dan Password wajib diisi." });
+    if (!username || !nama) {
+      toast.error("Gagal", { description: "Username dan Nama wajib diisi." });
       return;
     }
 
-    const success = addUser({
-      username,
-      nama,
-      email,
-      role,
-      password,
-      aksesKlasifikasi: akses
-    });
+    if (isEditing && editingId) {
+      const updateData: Partial<User> & { password?: string } = {
+        username,
+        nama,
+        email,
+        role,
+        aksesKlasifikasi: akses,
+        statusAktif
+      };
+      if (password) updateData.password = password; // Only update if provided
 
-    if (success) {
-      toast.success("User ditambahkan", { description: `User ${username} berhasil dibuat.` });
-      // Reset form
-      setUsername("");
-      setNama("");
-      setEmail("");
-      setPassword("");
-      setRole("user");
-      setAkses(["B"]);
+      if (updateUser(editingId, updateData)) {
+        toast.success("User diperbarui", { description: `Data user ${username} berhasil disimpan.` });
+        resetForm();
+      } else {
+        toast.error("Gagal", { description: "Terjadi kesalahan saat menyimpan data." });
+      }
     } else {
-      toast.error("Gagal menambahkan", { description: `Username ${username} sudah digunakan.` });
+      if (!password) {
+        toast.error("Gagal", { description: "Password wajib diisi untuk user baru." });
+        return;
+      }
+
+      const success = addUser({
+        username,
+        nama,
+        email,
+        role,
+        password,
+        aksesKlasifikasi: akses,
+        statusAktif
+      });
+
+      if (success) {
+        toast.success("User ditambahkan", { description: `User ${username} berhasil dibuat.` });
+        resetForm();
+      } else {
+        toast.error("Gagal menambahkan", { description: `Username ${username} sudah digunakan.` });
+      }
     }
   };
 
@@ -86,15 +145,30 @@ export function ManajemenUser() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-blue-600" />
-                Tambah User Baru
+                {isEditing ? <Edit className="w-5 h-5 text-amber-600" /> : <PlusCircle className="w-5 h-5 text-blue-600" />}
+                {isEditing ? "Edit User" : "Tambah User Baru"}
               </CardTitle>
               <CardDescription>
-                Buat akun pengguna baru dengan hak akses spesifik.
+                {isEditing ? "Perbarui detail dan hak akses pengguna." : "Buat akun pengguna baru dengan hak akses spesifik."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {isEditing && (
+                  <div className="flex items-center justify-between bg-amber-50 p-3 rounded-md mb-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="statusAktif"
+                        checked={statusAktif}
+                        onCheckedChange={setStatusAktif}
+                      />
+                      <Label htmlFor="statusAktif" className="font-medium">
+                        {statusAktif ? <span className="text-green-600">Akun Aktif</span> : <span className="text-red-600">Akun Inaktif</span>}
+                      </Label>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="nama">Nama Lengkap</Label>
                   <Input
@@ -129,14 +203,14 @@ export function ManajemenUser() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password {isEditing && <span className="text-xs text-slate-400 font-normal">(Opsional - Kosongkan jika tidak diubah)</span>}</Label>
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Masukkan sandi awal"
-                    required
+                    placeholder={isEditing ? "Kosongkan jika tidak mengubah sandi" : "Masukkan sandi awal"}
+                    required={!isEditing}
                   />
                 </div>
 
@@ -183,9 +257,16 @@ export function ManajemenUser() {
                   </p>
                 </div>
 
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-                  Simpan Akun
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="submit" className={`w-full ${isEditing ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                    {isEditing ? "Simpan Perubahan" : "Simpan Akun"}
+                  </Button>
+                  {isEditing && (
+                    <Button type="button" variant="outline" onClick={resetForm} className="w-1/3">
+                      Batal
+                    </Button>
+                  )}
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -214,8 +295,13 @@ export function ManajemenUser() {
                   </thead>
                   <tbody>
                     {users && users.map((u) => (
-                      <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-medium text-slate-900">{u.nama}</td>
+                      <tr key={u.id} className={`border-b border-slate-100 hover:bg-slate-50/50 ${u.statusAktif === false ? 'opacity-60 bg-slate-50' : ''}`}>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900">{u.nama}</div>
+                          {u.statusAktif === false && (
+                            <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">INAKTIF</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{u.username}</td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex justify-center gap-1 flex-wrap">
@@ -240,7 +326,26 @@ export function ManajemenUser() {
                             {u.role.toUpperCase()}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center flex justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                            onClick={() => handleEditClick(u)}
+                            title="Edit User"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${u.statusAktif === false ? 'text-green-500 hover:text-green-700 hover:bg-green-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                            onClick={() => handleToggleStatus(u)}
+                            disabled={user?.id === u.id}
+                            title={user?.id === u.id ? "Tidak dapat menonaktifkan akun sendiri" : (u.statusAktif === false ? "Aktifkan User" : "Nonaktifkan User")}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"

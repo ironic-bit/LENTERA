@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import type { User, UserRole } from "@/types/auth";
+import type { User, UserRole, AksesKlasifikasi } from "@/types/auth";
 import { DEFAULT_USERS, DEFAULT_USER_PASSWORDS, hasPermission } from "@/types/auth";
+import { supabase } from "@/supabaseClient";
 
-const AUTH_STORAGE_KEY = "arsip-auth-session";
 const USERS_STORAGE_KEY = "arsip-users-data";
 const PASSWORDS_STORAGE_KEY = "arsip-passwords-data";
 
@@ -17,6 +17,7 @@ interface AuthContextType {
   userRole: UserRole | null;
   addUser: (userData: Omit<User, "id"> & { password?: string }) => boolean;
   deleteUser: (id: string) => boolean;
+  updateUser: (id: string, partialData: Partial<User>) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load existing users data and session on mount
   useEffect(() => {
+    // Local storage logic (Fallback for demo accounts)
     try {
       const storedUsers = localStorage.getItem(USERS_STORAGE_KEY);
       const storedPasswords = localStorage.getItem(PASSWORDS_STORAGE_KEY);
@@ -41,47 +43,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(DEFAULT_USER_PASSWORDS));
       }
     } catch {
-      // Fallback
       setUsers(DEFAULT_USERS);
       setPasswords(DEFAULT_USER_PASSWORDS);
     }
 
-    const stored = sessionStorage.getItem(AUTH_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setUser(parsed);
-      } catch {
-        sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    // Supabase Auth listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        // Fetch profile data from public.profiles
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileData && !error) {
+          setUser({
+            id: profileData.id,
+            username: profileData.username || profileData.email?.split('@')[0] || "user",
+            nama: profileData.nama || "User",
+            role: (profileData.role as UserRole) || "viewer",
+            email: profileData.email || session.user.email,
+            aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
+          });
+        } else {
+          // Fallback if profile doesn't exist yet
+          setUser({
+            id: session.user.id,
+            username: session.user.email?.split('@')[0] || "user",
+            nama: "User Baru",
+            role: "viewer",
+            email: session.user.email,
+            aksesKlasifikasi: ["B"],
+          });
+        }
+      } else {
+        setUser(null);
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Save session whenever user changes
-  useEffect(() => {
-    if (user) {
-      sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    let emailToUse = identifier;
+
+    // Check if identifier is NOT an email (doesn't contain @)
+    if (!identifier.includes('@')) {
+      // It's a username or NIP. We need to look up the email in the profiles table.
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .or(`username.eq.${identifier},nip.eq.${identifier}`)
+        .limit(1);
+
+      if (error || !profiles || profiles.length === 0) {
+        // If not found in Supabase, fallback to local demo accounts if you still want them to work
+        const expectedPassword = passwords[identifier.toLowerCase()] || passwords[identifier];
+        const foundUser = users.find(
+          (u) => u.username.toLowerCase() === identifier.toLowerCase()
+        );
+
+        if (foundUser && expectedPassword === password) {
+          setUser(foundUser);
+          setIsLoading(false);
+          return true;
+        }
+
+        setIsLoading(false);
+        return false;
+      }
+
+      emailToUse = profiles[0].email;
     }
-  }, [user]);
 
-  const login = useCallback(async (username: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Sign in with Supabase Auth using the resolved email
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: emailToUse,
+      password: password,
+    });
 
-    // Support case-sensitive password but case-insensitive username lookup
-    const expectedPassword = passwords[username.toLowerCase()] || passwords[username];
-    const foundUser = users.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase()
-    );
+    setIsLoading(false);
 
-    if (foundUser && expectedPassword === password) {
-      setUser(foundUser);
-      return true;
+    if (signInError) {
+      console.error("Login failed:", signInError.message);
+      return false;
     }
-    return false;
+
+    return true;
   }, [users, passwords]);
 
   const addUser = useCallback((userData: Omit<User, "id"> & { password?: string }): boolean => {
@@ -96,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: userData.role,
       email: userData.email,
       aksesKlasifikasi: userData.aksesKlasifikasi || ["B"],
+      statusAktif: userData.statusAktif ?? true,
     };
 
     const newUsers = [...users, newUser];
@@ -135,9 +196,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [users, passwords, user]);
 
-  const logout = useCallback(() => {
+  const updateUser = useCallback((id: string, partialData: Partial<User>): boolean => {
+    const userIndex = users.findIndex((u) => u.id === id);
+    if (userIndex === -1) return false;
+
+    // Optional: add logic here to sync with Supabase profiles table directly
+    // const { error } = await supabase.from('profiles').update(partialData).eq('id', id);
+
+    const updatedUsers = [...users];
+    updatedUsers[userIndex] = { ...updatedUsers[userIndex], ...partialData };
+
+    setUsers(updatedUsers);
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
+
+    // If updating self, update active session
+    if (user?.id === id) {
+      setUser(updatedUsers[userIndex]);
+    }
+
+    return true;
+  }, [users, user]);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    sessionStorage.removeItem(AUTH_STORAGE_KEY);
   }, []);
 
   const hasAccess = useCallback(
@@ -159,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRole: user?.role || null,
     addUser,
     deleteUser,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
