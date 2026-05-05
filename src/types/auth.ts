@@ -1,11 +1,15 @@
 export type UserRole = "admin" | "user" | "viewer";
 
+export type AksesKlasifikasi = "B" | "T" | "R" | "SR";
+
 export interface User {
   id: string;
   username: string;
   nama: string;
   role: UserRole;
   email?: string;
+  aksesKlasifikasi?: AksesKlasifikasi[];
+  statusAktif?: boolean;
 }
 
 export interface AuthState {
@@ -27,6 +31,8 @@ export const DEFAULT_USERS: User[] = [
     nama: "Administrator",
     role: "admin",
     email: "admin@instansi.go.id",
+    aksesKlasifikasi: ["B", "T", "R", "SR"],
+    statusAktif: true,
   },
   {
     id: "2",
@@ -34,6 +40,8 @@ export const DEFAULT_USERS: User[] = [
     nama: "Pegawai Umum",
     role: "user",
     email: "pegawai@instansi.go.id",
+    aksesKlasifikasi: ["B"],
+    statusAktif: true,
   },
   {
     id: "3",
@@ -41,11 +49,13 @@ export const DEFAULT_USERS: User[] = [
     nama: "Viewer Only",
     role: "viewer",
     email: "viewer@instansi.go.id",
+    aksesKlasifikasi: ["B"],
+    statusAktif: true,
   },
 ];
 
-// Password untuk demo (dalam produksi harus di-hash)
-export const USER_PASSWORDS: Record<string, string> = {
+// Default Password untuk demo (dalam produksi harus di-hash)
+export const DEFAULT_USER_PASSWORDS: Record<string, string> = {
   admin: "admin123",
   pegawai: "pegawai123",
   viewer: "viewer123",

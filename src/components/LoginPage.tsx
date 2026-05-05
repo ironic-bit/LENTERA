@@ -23,15 +23,18 @@ export function LoginPage() {
     const success = await login(username, password);
     if (!success) {
       setError("Username atau password salah!");
+    } else {
+      // Refresh the page or force a view update if needed, but the App.tsx already handles isAuthenticated.
+      // However, the view might still be "login" so let's trigger something or let App component react to isAuthenticated.
     }
 
     setIsLoading(false);
   };
 
   const demoAccounts = [
-    { role: "Admin", username: "admin", password: "admin123", desc: "Akses penuh" },
-    { role: "User", username: "pegawai", password: "pegawai123", desc: "View, Create, Edit" },
-    { role: "Viewer", username: "viewer", password: "viewer123", desc: "View only" },
+    { role: "Admin", username: "admin", password: "admin123", desc: "Akses penuh", longDesc: "Memiliki kontrol penuh atas seluruh sistem, termasuk manajemen pengguna, pengaturan aplikasi, dan persetujuan akhir arsip." },
+    { role: "User", username: "pegawai", password: "pegawai123", desc: "View, Create, Edit", longDesc: "Dapat membuat, mengedit, dan mengelola arsip harian. Cocok untuk staf yang menangani dokumen secara langsung." },
+    { role: "Viewer", username: "viewer", password: "viewer123", desc: "View only", longDesc: "Hanya dapat melihat dan mencari arsip yang sudah disetujui. Tidak memiliki akses untuk mengubah atau menghapus data." },
   ];
 
   return (
@@ -66,13 +69,13 @@ export function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username" className="text-slate-300 font-medium">
-                  Username
+                  Username / NIP / Email
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <Input
                     id="username"
-                    placeholder="Masukkan username"
+                    placeholder="Masukkan email, username, atau NIP"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="pl-10 h-12 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-amber-500 focus:ring-amber-500"
@@ -149,11 +152,7 @@ export function LoginPage() {
             {demoAccounts.map((account, index) => (
               <Card
                 key={index}
-                className="border-0 shadow-lg bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 hover:border-amber-500/30 transition-all cursor-pointer group"
-                onClick={() => {
-                  setUsername(account.username);
-                  setPassword(account.password);
-                }}
+                className="border-0 shadow-lg bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 transition-all"
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
@@ -192,27 +191,14 @@ export function LoginPage() {
                           {account.desc}
                         </Badge>
                       </div>
-                      <p className="text-sm text-slate-400">
-                        Username: <span className="font-mono text-slate-300">{account.username}</span> | 
-                        Password: <span className="font-mono text-slate-300">{account.password}</span>
+                      <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+                        {account.longDesc}
                       </p>
-                    </div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-xs text-amber-400 font-medium">
-                        Klik untuk isi
-                      </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
-          </div>
-
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-            <p className="text-sm text-amber-300">
-              <strong>💡 Tips:</strong> Klik salah satu kartu di atas untuk mengisi otomatis username dan password. 
-              Setiap role memiliki hak akses yang berbeda terhadap data arsip.
-            </p>
           </div>
         </div>
       </div>
