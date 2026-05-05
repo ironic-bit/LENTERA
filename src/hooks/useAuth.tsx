@@ -90,12 +90,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check initial session
     supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+      .then(async ({ data: { session }, error }) => {
         if (error) {
           console.error("Error getting session:", error);
           setIsLoading(false);
         } else if (!session) {
           setIsLoading(false);
+        } else {
+          // If a session exists, we must fetch the profile manually here
+          // because onAuthStateChange might not fire for the INITIAL load if it's already cached.
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileData && !profileError) {
+              setUser({
+                id: profileData.id,
+                username: profileData.username || profileData.email?.split('@')[0] || "user",
+                nama: profileData.nama || "User",
+                role: (profileData.role as UserRole) || "viewer",
+                email: profileData.email || session.user.email,
+                aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
+              });
+            } else {
+              setUser({
+                id: session.user.id,
+                username: session.user.email?.split('@')[0] || "user",
+                nama: "User Baru",
+                role: "viewer",
+                email: session.user.email,
+                aksesKlasifikasi: ["B"],
+              });
+            }
+          } catch (err) {
+            console.error("Error fetching initial profile:", err);
+          } finally {
+            setIsLoading(false);
+          }
         }
       })
       .catch((err) => {
