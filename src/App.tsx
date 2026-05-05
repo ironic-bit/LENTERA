@@ -91,7 +91,8 @@ function AppContent() {
   // If we reach here and are not authenticated (e.g. after logout), redirect to homepage/login
   if (!isAuthenticated) {
     if (view !== "homepage" && view !== "login") {
-      setView("login");
+      // Saat logout, kita kembali ke homepage saja agar tidak stuck di form login
+      setView("homepage");
     }
     // Render nothing while state updates
     return null;
