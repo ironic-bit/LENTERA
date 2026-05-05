@@ -49,46 +49,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Supabase Auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        // Fetch profile data from public.profiles
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+      try {
+        if (session?.user) {
+          // Fetch profile data from public.profiles
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
 
-        if (profileData && !error) {
-          setUser({
-            id: profileData.id,
-            username: profileData.username || profileData.email?.split('@')[0] || "user",
-            nama: profileData.nama || "User",
-            role: (profileData.role as UserRole) || "viewer",
-            email: profileData.email || session.user.email,
-            aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
-          });
+          if (profileData && !error) {
+            setUser({
+              id: profileData.id,
+              username: profileData.username || profileData.email?.split('@')[0] || "user",
+              nama: profileData.nama || "User",
+              role: (profileData.role as UserRole) || "viewer",
+              email: profileData.email || session.user.email,
+              aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
+            });
+          } else {
+            // Fallback if profile doesn't exist yet
+            setUser({
+              id: session.user.id,
+              username: session.user.email?.split('@')[0] || "user",
+              nama: "User Baru",
+              role: "viewer",
+              email: session.user.email,
+              aksesKlasifikasi: ["B"],
+            });
+          }
         } else {
-          // Fallback if profile doesn't exist yet
-          setUser({
-            id: session.user.id,
-            username: session.user.email?.split('@')[0] || "user",
-            nama: "User Baru",
-            role: "viewer",
-            email: session.user.email,
-            aksesKlasifikasi: ["B"],
-          });
+          setUser(null);
         }
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false);
-    });
-
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      } catch (err) {
+        console.error("Error in onAuthStateChange:", err);
+      } finally {
         setIsLoading(false);
       }
     });
+
+    // Check initial session
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error("Error getting session:", error);
+          setIsLoading(false);
+        } else if (!session) {
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error("Exception getting session:", err);
+        setIsLoading(false);
+      });
 
     return () => {
       subscription.unsubscribe();
@@ -99,43 +112,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     let emailToUse = identifier;
 
-    // Check if identifier is NOT an email (doesn't contain @)
-    if (!identifier.includes('@')) {
-      // It's a username or NIP. We need to look up the email in the profiles table.
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('email')
-        .or(`username.eq.${identifier},nip.eq.${identifier}`)
-        .limit(1);
+    try {
+      // Check if identifier is NOT an email (doesn't contain @)
+      if (!identifier.includes('@')) {
+        // It's a username or NIP. We need to look up the email in the profiles table.
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('email')
+          .or(`username.eq.${identifier},nip.eq.${identifier}`)
+          .limit(1);
 
-      if (error || !profiles || profiles.length === 0) {
-        // If not found in Supabase, we can no longer fallback to dummy passwords as we removed the dummy password state.
+        if (error || !profiles || profiles.length === 0) {
+          // If not found in Supabase
+          setIsLoading(false);
+          return false;
+        }
+
+        emailToUse = profiles[0].email;
+      }
+
+      // Sign in with Supabase Auth using the resolved email
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailToUse,
+        password: password,
+      });
+
+      if (signInError) {
+        console.error("Login failed:", signInError.message);
         setIsLoading(false);
         return false;
       }
 
-      emailToUse = profiles[0].email;
-    }
+      // We do NOT set isLoading(false) here on SUCCESS, because onAuthStateChange
+      // will handle it once the user profile is fetched, preventing a flicker.
+      // Or we can set it, but onAuthStateChange might overlap. Let's just return true.
+      // Wait, we need to return true, but the caller (LoginPage) handles its own loading state.
+      // Still, we'll let onAuthStateChange resolve the global isLoading.
+      return true;
 
-    // Sign in with Supabase Auth using the resolved email
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: emailToUse,
-      password: password,
-    });
-
-    setIsLoading(false);
-
-    if (signInError) {
-      console.error("Login failed:", signInError.message);
+    } catch (err) {
+      console.error("Login exception:", err);
+      setIsLoading(false);
       return false;
     }
-
-    return true;
   }, []);
 
   const addUser = useCallback(async (userData: Omit<User, "id"> & { password?: string }): Promise<boolean> => {
+    // Get the current session to pass the authorization header
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
     // We invoke the Supabase Edge Function to create the user safely without logging out the admin
     const { data, error } = await supabase.functions.invoke('create-user', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
       body: {
         email: userData.email,
         password: userData.password || "password123",
@@ -186,9 +217,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [users, user]);
 
-  const updateUser = useCallback(async (id: string, partialData: Partial<User>): Promise<boolean> => {
+  const updateUser = useCallback(async (id: string, partialData: Partial<User> & { password?: string }): Promise<boolean> => {
     const userIndex = users.findIndex((u) => u.id === id);
     if (userIndex === -1) return false;
+
+    // If password is included and caller is trying to change it
+    if (partialData.password) {
+      // NOTE: Changing another user's password directly from the client is restricted.
+      // Usually requires an Edge Function to bypass RLS, similar to `create-user`.
+      // For this implementation, we simply warn unless updating own password.
+      if (user?.id === id) {
+        const { error: pwError } = await supabase.auth.updateUser({ password: partialData.password });
+        if (pwError) {
+          console.error("Failed to update password:", pwError.message);
+          return false;
+        }
+      } else {
+        console.warn("Attempting to change another user's password. This requires an admin edge function. Proceeding with profile update only.");
+        // An edge function `update-user` would be needed here for admins to change passwords.
+      }
+    }
 
     // Map the internal User fields to the Supabase profiles columns
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -20,15 +20,19 @@ export function LoginPage() {
     setError("");
     setIsLoading(true);
 
-    const success = await login(username, password);
-    if (!success) {
-      setError("Username atau password salah!");
-    } else {
-      // Refresh the page or force a view update if needed, but the App.tsx already handles isAuthenticated.
-      // However, the view might still be "login" so let's trigger something or let App component react to isAuthenticated.
+    try {
+      const success = await login(username, password);
+      if (!success) {
+        setError("Username atau password salah!");
+        setIsLoading(false);
+      }
+      // If success is true, we don't set isLoading(false) immediately
+      // because App.tsx will handle the state change based on isAuthenticated,
+      // avoiding unmounting the loading indicator while the view shifts.
+    } catch (err) {
+      setError("Terjadi kesalahan saat login.");
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const demoAccounts = [
