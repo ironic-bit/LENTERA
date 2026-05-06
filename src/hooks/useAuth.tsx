@@ -144,29 +144,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    let emailToUse = identifier;
+    const normalizedIdentifier = identifier.trim();
+    let emailToUse = normalizedIdentifier;
 
     try {
-      // Check if identifier is NOT an email (doesn't contain @)
-      if (!identifier.includes('@')) {
-        // It's a username or NIP. We need to look up the email in the profiles table.
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('email')
-          .or(`username.eq.${identifier},nip.eq.${identifier}`)
-          .limit(1);
+      // Supabase Auth only accepts email + password. For username/NIP logins,
+      // resolve the email first. Default demo usernames are resolved locally so
+      // production login still works even when anonymous reads on `profiles` are
+      // restricted by RLS on the deployed Supabase project.
+      if (!normalizedIdentifier.includes('@')) {
+        const defaultUser = DEFAULT_USERS.find(
+          (u) => u.username.toLowerCase() === normalizedIdentifier.toLowerCase()
+        );
 
-        if (error || !profiles || profiles.length === 0) {
-          // If not found in Supabase
-          setIsLoading(false);
-          return false;
+        if (defaultUser?.email) {
+          emailToUse = defaultUser.email;
+        } else {
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('email')
+            .or(`username.eq.${normalizedIdentifier},nip.eq.${normalizedIdentifier}`)
+            .limit(1);
+
+          if (error) {
+            console.error("Failed to resolve login identifier:", error.message);
+            setIsLoading(false);
+            return false;
+          }
+
+          if (!profiles || profiles.length === 0 || !profiles[0].email) {
+            setIsLoading(false);
+            return false;
+          }
+
+          emailToUse = profiles[0].email;
         }
-
-        emailToUse = profiles[0].email;
       }
-
-      // Special override: If email is the specific admin email, we could hypothetically trigger something.
-      // For now, we will rely on a trigger or just logging in normally.
 
       // Sign in with Supabase Auth using the resolved email
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -188,6 +201,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (profileData && !profileError) {
+        if (profileData.status_aktif === false) {
+          await supabase.auth.signOut();
+          setUser(null);
+          setIsLoading(false);
+          return false;
+        }
+
         // Automatically make "admin@instansi.go.id" an admin if not already
         if (emailToUse === "admin@instansi.go.id" && profileData.role !== 'admin') {
            await supabase.from('profiles').update({ role: 'admin', akses_klasifikasi: ['SR', 'R', 'T', 'B'] }).eq('id', authData.user.id);
@@ -202,6 +222,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: (profileData.role as UserRole) || "viewer",
           email: profileData.email || authData.user.email,
           aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
+        });
+      } else {
+        console.error("Failed to load user profile after login:", profileError?.message);
+        setUser({
+          id: authData.user.id,
+          username: authData.user.email?.split('@')[0] || "user",
+          nama: "User Baru",
+          role: "viewer",
+          email: authData.user.email,
+          aksesKlasifikasi: ["B"],
         });
       }
 
