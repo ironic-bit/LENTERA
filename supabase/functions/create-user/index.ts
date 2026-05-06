@@ -18,12 +18,45 @@ serve(async (req: Request) => {
 
     // IMPORTANT: We use the SERVICE_ROLE_KEY to bypass RLS and create users safely.
     // This key is automatically injected by Supabase into edge functions.
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
       },
     });
+
+    // Verify the caller is an Admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: callerUser }, error: verifyError } = await supabaseAdmin.auth.getUser(token);
+
+    if (verifyError || !callerUser) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check caller's role in profiles
+    const { data: callerProfile, error: profileCheckError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', callerUser.id)
+      .single();
+
+    if (profileCheckError || callerProfile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: "Unauthorized: Admins only" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // 1. Parse Request Body
     const requestData = await req.json();
@@ -34,7 +67,7 @@ serve(async (req: Request) => {
     }
 
     // 2. Create User using Auth Admin API
-    const { data: userData, error: authError } = await supabase.auth.admin.createUser({
+    const { data: userData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
       email_confirm: true, // Auto confirm so they can login immediately
@@ -52,7 +85,7 @@ serve(async (req: Request) => {
 
     // 3. Update the `profiles` table to set the custom fields
     // Because the trigger might have already created a row, we use upsert (or update)
-    const { error: profileError } = await supabase.from("profiles").upsert({
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
       id: userId,
       email: email,
       username: username,
