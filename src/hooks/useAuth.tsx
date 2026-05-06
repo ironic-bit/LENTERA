@@ -143,7 +143,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
+    // We are deliberately bypassing the global `setIsLoading(true)` during standard login phase.
+    // The component (`LoginPage.tsx`) handles its own local visual spinner.
+    // Globally flipping `isLoading` true can cause `App.tsx` to unmount the entire layout,
+    // leading to severe bugs where the component never mounts back to cancel its own spinner.
     let emailToUse = identifier;
 
     try {
@@ -157,16 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .limit(1);
 
         if (error || !profiles || profiles.length === 0) {
-          // If not found in Supabase
-          setIsLoading(false);
           return false;
         }
 
         emailToUse = profiles[0].email;
       }
-
-      // Special override: If email is the specific admin email, we could hypothetically trigger something.
-      // For now, we will rely on a trigger or just logging in normally.
 
       // Sign in with Supabase Auth using the resolved email
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -176,11 +174,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (signInError || !authData.user) {
         console.error("Login failed:", signInError?.message);
-        setIsLoading(false);
         return false;
       }
 
-      // Ensure profile is loaded for this session manually to prevent race condition
+      // Fetch user profile immediately
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -203,14 +200,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: profileData.email || authData.user.email,
           aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
         });
+      } else {
+         setUser({
+          id: authData.user.id,
+          username: authData.user.email?.split('@')[0] || "user",
+          nama: "User Baru",
+          role: "viewer",
+          email: authData.user.email,
+          aksesKlasifikasi: ["B"],
+        });
       }
 
+      // Force global load state to false now that we have logged in
       setIsLoading(false);
       return true;
 
     } catch (err) {
       console.error("Login exception:", err);
-      setIsLoading(false);
       return false;
     }
   }, []);

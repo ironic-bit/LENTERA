@@ -62,12 +62,6 @@ function AppContent() {
     );
   }
 
-  // Ensure that if we are authenticated, we don't accidentally stay stuck on a 'login' or 'homepage' view internally
-  if (isAuthenticated && (view === "login" || view === "homepage")) {
-    setView("dashboard");
-    return null;
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -76,6 +70,16 @@ function AppContent() {
         </div>
       </div>
     );
+  }
+
+  // Ensure that if we are authenticated, we don't accidentally stay stuck on a 'login' or 'homepage' view internally
+  if (isAuthenticated && (view === "login" || view === "homepage")) {
+    // Wrap state update in timeout/useEffect queue so it doesn't interrupt render or get lost
+    setTimeout(() => {
+      setView("dashboard");
+    }, 0);
+    // While transitioning, we can render nothing or a tiny spinner
+    return null;
   }
 
   if (!isLoaded && isAuthenticated) {
