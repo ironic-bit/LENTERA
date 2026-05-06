@@ -165,23 +165,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailToUse = profiles[0].email;
       }
 
+      // Special override: If email is the specific admin email, we could hypothetically trigger something.
+      // For now, we will rely on a trigger or just logging in normally.
+
       // Sign in with Supabase Auth using the resolved email
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: emailToUse,
         password: password,
       });
 
-      if (signInError) {
-        console.error("Login failed:", signInError.message);
+      if (signInError || !authData.user) {
+        console.error("Login failed:", signInError?.message);
         setIsLoading(false);
         return false;
       }
 
-      // We do NOT set isLoading(false) here on SUCCESS, because onAuthStateChange
-      // will handle it once the user profile is fetched, preventing a flicker.
-      // Or we can set it, but onAuthStateChange might overlap. Let's just return true.
-      // Wait, we need to return true, but the caller (LoginPage) handles its own loading state.
-      // Still, we'll let onAuthStateChange resolve the global isLoading.
+      // Ensure profile is loaded for this session manually to prevent race condition
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileData && !profileError) {
+        // Automatically make "admin@instansi.go.id" an admin if not already
+        if (emailToUse === "admin@instansi.go.id" && profileData.role !== 'admin') {
+           await supabase.from('profiles').update({ role: 'admin', akses_klasifikasi: ['SR', 'R', 'T', 'B'] }).eq('id', authData.user.id);
+           profileData.role = 'admin';
+           profileData.akses_klasifikasi = ['SR', 'R', 'T', 'B'];
+        }
+
+        setUser({
+          id: profileData.id,
+          username: profileData.username || profileData.email?.split('@')[0] || "user",
+          nama: profileData.nama || "User",
+          role: (profileData.role as UserRole) || "viewer",
+          email: profileData.email || authData.user.email,
+          aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
+        });
+      }
+
+      setIsLoading(false);
       return true;
 
     } catch (err) {

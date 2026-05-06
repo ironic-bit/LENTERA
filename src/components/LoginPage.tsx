@@ -25,10 +25,12 @@ export function LoginPage() {
       if (!success) {
         setError("Username atau password salah!");
         setIsLoading(false);
+      } else {
+        // Fallback safety to remove loading after a timeout if the redirect doesn't happen fast enough
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
       }
-      // If success is true, we don't set isLoading(false) immediately
-      // because App.tsx will handle the state change based on isAuthenticated,
-      // avoiding unmounting the loading indicator while the view shifts.
     } catch (err) {
       setError("Terjadi kesalahan saat login.");
       setIsLoading(false);
