@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
-import type { User, UserRole, AksesKlasifikasi } from "@/types/auth";
+import type { User, UserRole } from "@/types/auth";
 import { DEFAULT_USERS, hasPermission } from "@/types/auth";
 import { supabase } from "@/supabaseClient";
 
@@ -28,197 +28,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Load existing users data and session on mount
   useEffect(() => {
-    // Fetch real users from public.profiles
-    const fetchRealUsers = async () => {
-      const { data: profiles, error } = await supabase.from('profiles').select('*');
-      if (profiles && !error) {
-        const mappedUsers: User[] = profiles.map(p => ({
-          id: p.id,
-          username: p.username || p.email?.split('@')[0] || "user",
-          nama: p.nama || "User",
-          role: (p.role as UserRole) || "viewer",
-          email: p.email,
-          aksesKlasifikasi: p.akses_klasifikasi || ["B"],
-          statusAktif: p.status_aktif ?? true,
-        }));
-        setUsers(mappedUsers);
-      }
-    };
-
-    fetchRealUsers();
-
-    // Supabase Auth listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Override: disable Supabase completely and use mock local session logic
+    const localUsersStr = localStorage.getItem(USERS_STORAGE_KEY);
+    if (localUsersStr) {
       try {
-        if (session?.user) {
-          // Fetch profile data from public.profiles
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileData && !error) {
-            setUser({
-              id: profileData.id,
-              username: profileData.username || profileData.email?.split('@')[0] || "user",
-              nama: profileData.nama || "User",
-              role: (profileData.role as UserRole) || "viewer",
-              email: profileData.email || session.user.email,
-              aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
-            });
-          } else {
-            // Fallback if profile doesn't exist yet
-            setUser({
-              id: session.user.id,
-              username: session.user.email?.split('@')[0] || "user",
-              nama: "User Baru",
-              role: "viewer",
-              email: session.user.email,
-              aksesKlasifikasi: ["B"],
-            });
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Error in onAuthStateChange:", err);
-      } finally {
-        setIsLoading(false);
+        setUsers(JSON.parse(localUsersStr));
+      } catch {
+        setUsers(DEFAULT_USERS);
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
       }
-    });
+    } else {
+      setUsers(DEFAULT_USERS);
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
+    }
 
-    // Check initial session
-    supabase.auth.getSession()
-      .then(async ({ data: { session }, error }) => {
-        if (error) {
-          console.error("Error getting session:", error);
-          setIsLoading(false);
-        } else if (!session) {
-          setIsLoading(false);
-        } else {
-          // If a session exists, we must fetch the profile manually here
-          // because onAuthStateChange might not fire for the INITIAL load if it's already cached.
-          try {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
+    const localSessionStr = localStorage.getItem("local-session-user");
+    if (localSessionStr) {
+      try {
+        setUser(JSON.parse(localSessionStr));
+      } catch {
+        setUser(null);
+      }
+    } else {
+      setUser(null);
+    }
 
-            if (profileData && !profileError) {
-              setUser({
-                id: profileData.id,
-                username: profileData.username || profileData.email?.split('@')[0] || "user",
-                nama: profileData.nama || "User",
-                role: (profileData.role as UserRole) || "viewer",
-                email: profileData.email || session.user.email,
-                aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
-              });
-            } else {
-              setUser({
-                id: session.user.id,
-                username: session.user.email?.split('@')[0] || "user",
-                nama: "User Baru",
-                role: "viewer",
-                email: session.user.email,
-                aksesKlasifikasi: ["B"],
-              });
-            }
-          } catch (err) {
-            console.error("Error fetching initial profile:", err);
-          } finally {
-            setIsLoading(false);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error("Exception getting session:", err);
-        setIsLoading(false);
-      });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    setIsLoading(false);
   }, []);
 
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
-    // We are deliberately bypassing the global `setIsLoading(true)` during standard login phase.
-    // The component (`LoginPage.tsx`) handles its own local visual spinner.
-    // Globally flipping `isLoading` true can cause `App.tsx` to unmount the entire layout,
-    // leading to severe bugs where the component never mounts back to cancel its own spinner.
-    let emailToUse = identifier;
-
-    try {
-      // Check if identifier is NOT an email (doesn't contain @)
-      if (!identifier.includes('@')) {
-        // It's a username or NIP. We need to look up the email in the profiles table.
-        const { data: profiles, error } = await supabase
-          .from('profiles')
-          .select('email')
-          .or(`username.eq.${identifier},nip.eq.${identifier}`)
-          .limit(1);
-
-        if (error || !profiles || profiles.length === 0) {
-          return false;
-        }
-
-        emailToUse = profiles[0].email;
-      }
-
-      // Sign in with Supabase Auth using the resolved email
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: emailToUse,
-        password: password,
-      });
-
-      if (signInError || !authData.user) {
-        console.error("Login failed:", signInError?.message);
-        return false;
-      }
-
-      // Fetch user profile immediately
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (profileData && !profileError) {
-        // Automatically make "admin@instansi.go.id" an admin if not already
-        if (emailToUse === "admin@instansi.go.id" && profileData.role !== 'admin') {
-           await supabase.from('profiles').update({ role: 'admin', akses_klasifikasi: ['SR', 'R', 'T', 'B'] }).eq('id', authData.user.id);
-           profileData.role = 'admin';
-           profileData.akses_klasifikasi = ['SR', 'R', 'T', 'B'];
-        }
-
-        setUser({
-          id: profileData.id,
-          username: profileData.username || profileData.email?.split('@')[0] || "user",
-          nama: profileData.nama || "User",
-          role: (profileData.role as UserRole) || "viewer",
-          email: profileData.email || authData.user.email,
-          aksesKlasifikasi: (profileData.akses_klasifikasi as AksesKlasifikasi[]) || ["B"],
-        });
-      } else {
-         setUser({
-          id: authData.user.id,
-          username: authData.user.email?.split('@')[0] || "user",
-          nama: "User Baru",
-          role: "viewer",
-          email: authData.user.email,
-          aksesKlasifikasi: ["B"],
-        });
-      }
-
-      // Force global load state to false now that we have logged in
+    // We are deliberately bypassing Supabase to prevent the loading lock in Production
+    // Check if credentials match any of the dummy accounts
+    if (identifier === "admin" && password === "admin123") {
+      const dummyAdminUser: User = {
+        id: "local-admin-1",
+        username: "admin",
+        nama: "Administrator (Local)",
+        role: "admin",
+        email: "admin@instansi.go.id",
+        aksesKlasifikasi: ["SR", "R", "T", "B"],
+        statusAktif: true,
+      };
+      setUser(dummyAdminUser);
+      localStorage.setItem("local-session-user", JSON.stringify(dummyAdminUser));
       setIsLoading(false);
       return true;
-
-    } catch (err) {
-      console.error("Login exception:", err);
-      return false;
     }
+
+    if (identifier === "pegawai" && password === "pegawai123") {
+      const dummyPegawaiUser: User = {
+        id: "local-pegawai-2",
+        username: "pegawai",
+        nama: "Pegawai Umum (Local)",
+        role: "user",
+        email: "pegawai@instansi.go.id",
+        aksesKlasifikasi: ["B"],
+        statusAktif: true,
+      };
+      setUser(dummyPegawaiUser);
+      localStorage.setItem("local-session-user", JSON.stringify(dummyPegawaiUser));
+      setIsLoading(false);
+      return true;
+    }
+
+    if (identifier === "viewer" && password === "viewer123") {
+      const dummyViewerUser: User = {
+        id: "local-viewer-3",
+        username: "viewer",
+        nama: "Viewer Only (Local)",
+        role: "viewer",
+        email: "viewer@instansi.go.id",
+        aksesKlasifikasi: ["B"],
+        statusAktif: true,
+      };
+      setUser(dummyViewerUser);
+      localStorage.setItem("local-session-user", JSON.stringify(dummyViewerUser));
+      setIsLoading(false);
+      return true;
+    }
+
+    // Default catch-all error if login doesn't match predefined locals
+    setIsLoading(false);
+    return false;
   }, []);
 
   const addUser = useCallback(async (userData: Omit<User, "id"> & { password?: string }): Promise<boolean> => {
@@ -337,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [users, user]);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem("local-session-user");
     setUser(null);
   }, []);
 

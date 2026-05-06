@@ -26,9 +26,10 @@ export function LoginPage() {
         setError("Username atau password salah!");
         setIsLoading(false);
       } else {
-        // Force the loading spinner to stop regardless of what App.tsx does.
-        // It's safer to have a brief flicker than a permanent spinner lock.
-        setIsLoading(false);
+        // Fallback safety to remove loading after a timeout if the redirect doesn't happen fast enough
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
       }
     } catch {
       setError("Terjadi kesalahan saat login.");
