@@ -28,7 +28,6 @@ import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown } from "lucide-react";
-import { supabase } from "../supabaseClient";
 import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
@@ -61,32 +60,33 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
     if (!canCreate) return;
 
     // --- 1. MENGIRIM DATA KE SUPABASE ---
-    const { error } = await supabase
-      .from('tabel_arsip') 
-      .insert([
-        {
-          kode_klasifikasi: formData.kodeKlasifikasi,
-          nomor_surat: formData.nomorSurat,
-          judul: formData.judul,
-          jenis_naskah: formData.jenisNaskah,
-          klasifikasi_keamanan: formData.klasifikasiKeamanan,
-          tahun: formData.tahun,
-          tanggal_surat: formData.tanggalSurat,
-          deskripsi: formData.deskripsi,
-          retensi_aktif: formData.retensiAktif,
-          retensi_inaktif: formData.retensiInaktif,
-          keterangan_retensi: formData.keteranganRetensi,
-          status_arsip: formData.statusArsip,
-          link_cloud: formData.linkCloud, // <-- PERBAIKAN: Pakai huruf C besar
-          registered_by: user?.nama || "Unknown"
-        }
-      ]);
+    // DISABLED: Supabase insert disabled during local proxy mode.
+    // const { error } = await supabase
+    //   .from('tabel_arsip')
+    //   .insert([
+    //     {
+    //       kode_klasifikasi: formData.kodeKlasifikasi,
+    //       nomor_surat: formData.nomorSurat,
+    //       judul: formData.judul,
+    //       jenis_naskah: formData.jenisNaskah,
+    //       klasifikasi_keamanan: formData.klasifikasiKeamanan,
+    //       tahun: formData.tahun,
+    //       tanggal_surat: formData.tanggalSurat,
+    //       deskripsi: formData.deskripsi,
+    //       retensi_aktif: formData.retensiAktif,
+    //       retensi_inaktif: formData.retensiInaktif,
+    //       keterangan_retensi: formData.keteranganRetensi,
+    //       status_arsip: formData.statusArsip,
+    //       link_cloud: formData.linkCloud,
+    //       registered_by: user?.nama || "Unknown"
+    //     }
+    //   ]);
 
-    if (error) {
-      console.error("Gagal menyimpan ke database:", error.message);
-      alert("Waduh, gagal registrasi ke database LENTERA. Cek log error.");
-      return; 
-    }
+    // if (error) {
+    //   console.error("Gagal menyimpan ke database:", error.message);
+    //   alert("Waduh, gagal registrasi ke database LENTERA. Cek log error.");
+    //   return;
+    // }
 
     // --- 2. MEMPERBARUI TAMPILAN ---
     onSubmit({
