@@ -31,7 +31,7 @@ export function LoginPage() {
           setIsLoading(false);
         }, 1000);
       }
-    } catch {
+    } catch (err) {
       setError("Terjadi kesalahan saat login.");
       setIsLoading(false);
     }

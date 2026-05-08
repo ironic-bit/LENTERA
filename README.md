@@ -1,73 +1,32 @@
-# React + TypeScript + Vite
+# LENTERA
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+LENTERA adalah aplikasi Vite + React untuk Layanan Elektronik Pengelolaan Terpadu Arsip.
 
-Currently, two official plugins are available:
+## Menjalankan lokal
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Konfigurasi Supabase
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Aplikasi membutuhkan environment variable berikut saat build:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<supabase-anon-or-publishable-key>
 ```
+
+Untuk Vercel, tambahkan keduanya di **Project Settings → Environment Variables** dan pastikan scope **Production** aktif. Setelah mengubah env, lakukan redeploy production karena Vite membaca `VITE_*` pada waktu build.
+
+## Checklist login di Vercel production
+
+Jika login hanya bermasalah di domain utama production:
+
+1. Pastikan `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` tersedia untuk environment **Production**, bukan hanya Preview/Development.
+2. Redeploy production setelah env diperbarui.
+3. Di Supabase Dashboard, pastikan domain utama production terdaftar pada konfigurasi Auth URL/Redirect URL bila memakai flow yang membutuhkan redirect, seperti magic link, reset password, invite, atau OAuth.
+4. Pastikan `package-lock.json` selalu sinkron dengan `package.json` agar Vercel memasang dependency yang sama dengan repo.
+
+Aplikasi juga menyetel storage key Supabase Auth yang stabil (`lentera-supabase-auth`) supaya sesi login konsisten pada domain production yang sama.
