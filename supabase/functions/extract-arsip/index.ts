@@ -46,18 +46,20 @@ serve(async (req: Request) => {
             {
               parts: [
                 {
-                  text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan surat dinas Indonesia.
-Ekstrak informasi berikut dari gambar surat yang diberikan. Jika tidak ditemukan, kosongkan saja ("").
+                  text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan dokumen arsip pemerintah daerah Indonesia.
+Dokumen bisa berupa: surat dinas, keputusan, peraturan, nota dinas, laporan, berita acara, MoU, kontrak, SK, proposal, notulen rapat, undangan, disposisi, sertifikat, piagam, SOP, atau dokumen resmi lainnya.
+
+Ekstrak informasi berikut dari gambar dokumen yang diberikan. Jika tidak ditemukan, kosongkan saja ("").
 
 Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan field berikut:
 {
-  "nomorSurat": "nomor surat lengkap",
-  "judul": "perihal/judul surat",
+  "nomorSurat": "nomor dokumen/surat/SK/keputusan lengkap",
+  "judul": "perihal/judul/tentang dari dokumen",
   "jenisNaskah": "salah satu dari: Surat Masuk, Surat Keluar, Keputusan, Peraturan, Nota Dinas, Memo, Disposisi, Surat Perintah, Surat Tugas, Surat Perjalanan Dinas, Surat Edaran, Surat Kuasa, Berita Acara, Surat Keterangan, Surat Pengantar, Pengumuman, Laporan, Telaahan Staf, Notula, Surat Undangan, Surat Izin, Rekomendasi, Sertifikat, Piagam, Surat Perjanjian, SOP, Lainnya",
-  "tanggalSurat": "format YYYY-MM-DD",
-  "tahun": angka tahun (number),
-  "deskripsi": "ringkasan singkat isi surat dalam 1-2 kalimat",
-  "klasifikasiKeamanan": "salah satu dari: B, T, R, SR (default B jika tidak jelas)"
+  "tanggalSurat": "tanggal dokumen dalam format YYYY-MM-DD",
+  "tahun": angka tahun dokumen (number),
+  "deskripsi": "ringkasan singkat isi/substansi dokumen dalam 1-2 kalimat",
+  "klasifikasiKeamanan": "salah satu dari: B (Biasa/Terbuka), T (Terbatas), R (Rahasia), SR (Sangat Rahasia) - default B jika tidak ada marking keamanan"
 }`
                 },
                 {

@@ -230,7 +230,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               <h4 className="text-sm font-semibold text-purple-800">AI Auto-Fill</h4>
             </div>
             <p className="text-xs text-purple-600 mb-3">
-              Upload foto/scan surat untuk mengisi form otomatis menggunakan AI
+              Upload foto/scan dokumen arsip untuk mengisi form otomatis menggunakan AI
             </p>
             <input
               ref={fileInputRef}
@@ -255,7 +255,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               ) : (
                 <>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Foto Surat
+                  Upload Foto Dokumen
                 </>
               )}
             </Button>
