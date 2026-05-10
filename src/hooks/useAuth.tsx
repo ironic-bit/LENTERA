@@ -140,7 +140,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Login ────────────────────────────────────────────────────────────────────
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
     const normalizedIdentifier = identifier.trim();
     let emailToUse = normalizedIdentifier;
 
@@ -154,7 +153,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .limit(1);
 
         if (error || !profiles || profiles.length === 0 || !profiles[0].email) {
-          setIsLoading(false);
           return false;
         }
         emailToUse = profiles[0].email;
@@ -168,7 +166,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (signInError || !authData.user) {
         console.error("Login failed:", signInError?.message);
-        setIsLoading(false);
         return false;
       }
 
@@ -179,7 +176,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profile.statusAktif === false) {
           await supabase.auth.signOut();
           setUser(null);
-          setIsLoading(false);
           return false;
         }
         setUser(profile);
@@ -198,7 +194,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true;
     } catch (err) {
       console.error("Login exception:", err);
-      setIsLoading(false);
       return false;
     }
   }, []);
