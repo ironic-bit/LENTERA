@@ -95,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.error("Error in onAuthStateChange:", err);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -207,6 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setIsLoading(false);
   }, []);
 
   // ─── User CRUD (Admin operations via Edge Functions) ──────────────────────────
