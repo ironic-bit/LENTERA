@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown } from "lucide-react";
+import { supabase } from "@/supabaseClient";
+import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
@@ -56,6 +57,78 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle AI extraction from uploaded image
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Format file tidak didukung. Gunakan JPG, PNG, WebP, atau PDF.");
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran file terlalu besar. Maksimal 10MB.");
+      return;
+    }
+
+    setIsExtracting(true);
+    try {
+      // Get auth token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        alert("Sesi login tidak valid. Silakan login ulang.");
+        return;
+      }
+
+      // Send file to Edge Function
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+
+      const { data, error } = await supabase.functions.invoke("extract-arsip", {
+        headers: { Authorization: `Bearer ${token}` },
+        body: formDataUpload,
+      });
+
+      if (error || !data?.success) {
+        console.error("Extraction failed:", error?.message || data?.error);
+        alert("Gagal mengekstrak data dari file. Coba lagi atau isi manual.");
+        return;
+      }
+
+      const extracted = data.data;
+
+      // Auto-fill form fields with extracted data
+      setFormData((prev) => ({
+        ...prev,
+        nomorSurat: extracted.nomorSurat || prev.nomorSurat,
+        judul: extracted.judul || prev.judul,
+        jenisNaskah: extracted.jenisNaskah || prev.jenisNaskah,
+        tanggalSurat: extracted.tanggalSurat || prev.tanggalSurat,
+        tahun: extracted.tahun || prev.tahun,
+        deskripsi: extracted.deskripsi || prev.deskripsi,
+        klasifikasiKeamanan: (["B", "T", "R", "SR"].includes(extracted.klasifikasiKeamanan) 
+          ? extracted.klasifikasiKeamanan 
+          : prev.klasifikasiKeamanan) as "SR" | "R" | "T" | "B",
+      }));
+
+      alert("Data berhasil diekstrak dari dokumen! Periksa dan lengkapi field yang kosong.");
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("Terjadi kesalahan saat memproses file.");
+    } finally {
+      setIsExtracting(false);
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +223,44 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
       </CardHeader>
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* AI Auto-Fill Section */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              <h4 className="text-sm font-semibold text-purple-800">AI Auto-Fill</h4>
+            </div>
+            <p className="text-xs text-purple-600 mb-3">
+              Upload foto/scan dokumen arsip untuk mengisi form otomatis menggunakan AI
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="ai-file-upload"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isExtracting}
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full border-purple-300 text-purple-700 hover:bg-purple-100 hover:text-purple-800"
+            >
+              {isExtracting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Mengekstrak data dengan AI...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Foto Dokumen
+                </>
+              )}
+            </Button>
+          </div>
+
           {/* Kode Klasifikasi */}
           <div className="space-y-2 flex flex-col">
             <Label htmlFor="kodeKlasifikasi" className="text-slate-700 font-medium">

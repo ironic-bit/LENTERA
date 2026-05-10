@@ -431,3 +431,10 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/update-user/deno.json"
 entrypoint = "./functions/update-user/index.ts"
+
+
+[functions.extract-arsip]
+enabled = true
+verify_jwt = true
+import_map = "./functions/extract-arsip/deno.json"
+entrypoint = "./functions/extract-arsip/index.ts"
