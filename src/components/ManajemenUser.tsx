@@ -129,9 +129,10 @@ export function ManajemenUser() {
     );
   };
 
-  const handleDelete = (id: string, namaUser: string) => {
+  const handleDelete = async (id: string, namaUser: string) => {
     if (confirm(`Apakah Anda yakin ingin menghapus user ${namaUser}?`)) {
-      if (deleteUser(id)) {
+      const success = await deleteUser(id);
+      if (success) {
         toast.success("User dihapus", { description: `User ${namaUser} berhasil dihapus.` });
       } else {
         toast.error("Gagal menghapus", { description: "Terjadi kesalahan atau Anda mencoba menghapus akun Anda sendiri." });

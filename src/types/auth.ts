@@ -24,43 +24,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   viewer: ["view"],
 };
 
-export const DEFAULT_USERS: User[] = [
-  {
-    id: "1",
-    username: "admin",
-    nama: "Administrator",
-    role: "admin",
-    email: "admin@instansi.go.id",
-    aksesKlasifikasi: ["B", "T", "R", "SR"],
-    statusAktif: true,
-  },
-  {
-    id: "2",
-    username: "pegawai",
-    nama: "Pegawai Umum",
-    role: "user",
-    email: "pegawai@instansi.go.id",
-    aksesKlasifikasi: ["B"],
-    statusAktif: true,
-  },
-  {
-    id: "3",
-    username: "viewer",
-    nama: "Viewer Only",
-    role: "viewer",
-    email: "viewer@instansi.go.id",
-    aksesKlasifikasi: ["B"],
-    statusAktif: true,
-  },
-];
-
-// Default Password untuk demo (dalam produksi harus di-hash)
-export const DEFAULT_USER_PASSWORDS: Record<string, string> = {
-  admin: "admin123",
-  pegawai: "pegawai123",
-  viewer: "viewer123",
-};
-
 export function hasPermission(role: UserRole, permission: string): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }

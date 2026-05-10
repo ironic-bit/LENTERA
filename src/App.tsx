@@ -25,20 +25,32 @@ function AppContent() {
     setView("login");
   };
 
-  const handleAddArsip = (arsipData: Parameters<typeof addArsip>[0]) => {
-    addArsip(arsipData);
-    toast.success("Arsip berhasil diregistrasi!", {
-      description: `${arsipData.nomorSurat} - ${arsipData.judul}`,
-    });
+  const handleAddArsip = async (arsipData: Parameters<typeof addArsip>[0]): Promise<boolean> => {
+    const result = await addArsip(arsipData);
+    if (result) {
+      toast.success("Arsip berhasil diregistrasi!", {
+        description: `${arsipData.nomorSurat} - ${arsipData.judul}`,
+      });
+      return true;
+    } else {
+      toast.error("Gagal menyimpan arsip", {
+        description: "Terjadi kesalahan saat menyimpan ke database.",
+      });
+      return false;
+    }
   };
 
-  const handleDeleteArsip = (id: string) => {
+  const handleDeleteArsip = async (id: string) => {
     const arsip = arsipList.find((a) => a.id === id);
     if (arsip) {
-      deleteArsip(id);
-      toast.info("Arsip telah dihapus", {
-        description: `${arsip.nomorSurat} - ${arsip.judul}`,
-      });
+      const success = await deleteArsip(id);
+      if (success) {
+        toast.info("Arsip telah dihapus", {
+          description: `${arsip.nomorSurat} - ${arsip.judul}`,
+        });
+      } else {
+        toast.error("Gagal menghapus arsip");
+      }
     }
   };
 
