@@ -30,14 +30,21 @@ serve(async (req: Request) => {
       });
     }
 
-    // Convert file to base64
+    // Convert file to base64 (chunk-based to avoid stack overflow on large files)
     const arrayBuffer = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const bytes = new Uint8Array(arrayBuffer);
+    let base64 = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      base64 += String.fromCharCode(...chunk);
+    }
+    base64 = btoa(base64);
     const mimeType = file.type || "image/jpeg";
 
     // Call Google Gemini API (free tier: 15 req/min, 1500/day)
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
