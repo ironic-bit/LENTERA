@@ -28,11 +28,10 @@ import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
 import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown } from "lucide-react";
-import { supabase } from "../supabaseClient";
 import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
-  onSubmit: (arsip: Omit<Arsip, "id" | "tanggalRegistrasi">) => void;
+  onSubmit: (arsip: Omit<Arsip, "id" | "tanggalRegistrasi">) => Promise<boolean>;
 }
 
 export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
@@ -56,45 +55,19 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
     linkCloud: "",
   });
 
- const handleSubmit = async (e: React.FormEvent) => { 
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canCreate) return;
 
-    // --- 1. MENGIRIM DATA KE SUPABASE ---
-    const { error } = await supabase
-      .from('tabel_arsip') 
-      .insert([
-        {
-          kode_klasifikasi: formData.kodeKlasifikasi,
-          nomor_surat: formData.nomorSurat,
-          judul: formData.judul,
-          jenis_naskah: formData.jenisNaskah,
-          klasifikasi_keamanan: formData.klasifikasiKeamanan,
-          tahun: formData.tahun,
-          tanggal_surat: formData.tanggalSurat,
-          deskripsi: formData.deskripsi,
-          retensi_aktif: formData.retensiAktif,
-          retensi_inaktif: formData.retensiInaktif,
-          keterangan_retensi: formData.keteranganRetensi,
-          status_arsip: formData.statusArsip,
-          link_cloud: formData.linkCloud, // <-- PERBAIKAN: Pakai huruf C besar
-          registered_by: user?.nama || "Unknown"
-        }
-      ]);
-
-    if (error) {
-      console.error("Gagal menyimpan ke database:", error.message);
-      alert("Waduh, gagal registrasi ke database LENTERA. Cek log error.");
-      return; 
-    }
-
-    // --- 2. MEMPERBARUI TAMPILAN ---
-    onSubmit({
+    // Panggil onSubmit yang sudah di-handle oleh useArsip (langsung ke Supabase)
+    const success = await onSubmit({
       ...formData,
       registeredBy: user?.nama || "Unknown",
     });
 
-    // --- 3. MERESET FORMULIR ---
+    if (!success) return;
+
+    // Reset formulir setelah berhasil
     setFormData({
       kodeKlasifikasi: "",
       nomorSurat: "",
@@ -108,10 +81,8 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
       retensiInaktif: 1,
       keteranganRetensi: "Musnah",
       statusArsip: "Aktif",
-      linkCloud: "", // <-- PERBAIKAN: Pakai huruf C besar
+      linkCloud: "",
     });
-
-    alert("Mantap! Arsip berhasil diregistrasi ke sistem LENTERA.");
   };
 
   // Jika tidak punya akses create, tampilkan pesan
