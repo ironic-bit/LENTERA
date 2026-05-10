@@ -11,9 +11,9 @@ serve(async (req: Request) => {
   }
 
   try {
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiApiKey) {
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -35,19 +35,18 @@ serve(async (req: Request) => {
     const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     const mimeType = file.type || "image/jpeg";
 
-    // Call OpenAI Vision API
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openaiApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan surat dinas Indonesia.
+    // Call Google Gemini API (free tier: 15 req/min, 1500/day)
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan surat dinas Indonesia.
 Ekstrak informasi berikut dari gambar surat yang diberikan. Jika tidak ditemukan, kosongkan saja ("").
 
 Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan field berikut:
@@ -60,49 +59,44 @@ Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan 
   "deskripsi": "ringkasan singkat isi surat dalam 1-2 kalimat",
   "klasifikasiKeamanan": "salah satu dari: B, T, R, SR (default B jika tidak jelas)"
 }`
+                },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1000,
           },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Ekstrak metadata dari surat/dokumen berikut:"
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`,
-                  detail: "high"
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.1,
-      }),
-    });
+        }),
+      }
+    );
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error("OpenAI API Error:", errorText);
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error("Gemini API Error:", errorText);
       return new Response(JSON.stringify({ error: "AI processing failed", details: errorText }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const openaiData = await openaiResponse.json();
-    const content = openaiData.choices?.[0]?.message?.content || "";
+    const geminiData = await geminiResponse.json();
+    const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    // Parse the JSON response from OpenAI
+    // Parse the JSON response from Gemini
     let extractedData;
     try {
       // Remove markdown code fences if present
       const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       extractedData = JSON.parse(cleanContent);
     } catch {
-      console.error("Failed to parse OpenAI response:", content);
+      console.error("Failed to parse Gemini response:", content);
       return new Response(JSON.stringify({ error: "Failed to parse AI response", raw: content }), {
         status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
