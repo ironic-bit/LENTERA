@@ -55,34 +55,57 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
     linkCloud: "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreate) return;
+    if (!canCreate || isSubmitting) return;
 
-    // Panggil onSubmit yang sudah di-handle oleh useArsip (langsung ke Supabase)
-    const success = await onSubmit({
-      ...formData,
-      registeredBy: user?.nama || "Unknown",
-    });
+    // Validasi manual untuk field yang pakai custom component (bukan native HTML)
+    if (!formData.kodeKlasifikasi) {
+      alert("Kode Klasifikasi wajib dipilih.");
+      return;
+    }
+    if (!formData.jenisNaskah) {
+      alert("Jenis Naskah wajib dipilih.");
+      return;
+    }
+    if (!formData.nomorSurat || !formData.judul || !formData.linkCloud) {
+      alert("Mohon lengkapi semua field yang bertanda *.");
+      return;
+    }
 
-    if (!success) return;
+    setIsSubmitting(true);
+    try {
+      const success = await onSubmit({
+        ...formData,
+        registeredBy: user?.nama || "Unknown",
+      });
 
-    // Reset formulir setelah berhasil
-    setFormData({
-      kodeKlasifikasi: "",
-      nomorSurat: "",
-      judul: "",
-      jenisNaskah: "",
-      klasifikasiKeamanan: "B",
-      tahun: new Date().getFullYear(),
-      tanggalSurat: new Date().toISOString().split("T")[0],
-      deskripsi: "",
-      retensiAktif: 2,
-      retensiInaktif: 1,
-      keteranganRetensi: "Musnah",
-      statusArsip: "Aktif",
-      linkCloud: "",
-    });
+      if (success) {
+        // Reset formulir setelah berhasil
+        setFormData({
+          kodeKlasifikasi: "",
+          nomorSurat: "",
+          judul: "",
+          jenisNaskah: "",
+          klasifikasiKeamanan: "B",
+          tahun: new Date().getFullYear(),
+          tanggalSurat: new Date().toISOString().split("T")[0],
+          deskripsi: "",
+          retensiAktif: 2,
+          retensiInaktif: 1,
+          keteranganRetensi: "Musnah",
+          statusArsip: "Aktif",
+          linkCloud: "",
+        });
+      }
+    } catch (err) {
+      console.error("Submit error:", err);
+      alert("Terjadi kesalahan saat menyimpan data.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Jika tidak punya akses create, tampilkan pesan
@@ -194,7 +217,6 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               placeholder="Contoh: 090/123/SETDA/2024"
               value={formData.nomorSurat}
               onChange={(e) => setFormData({ ...formData, nomorSurat: e.target.value })}
-              required
               className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
@@ -209,7 +231,6 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               placeholder="Masukkan judul atau perihal arsip"
               value={formData.judul}
               onChange={(e) => setFormData({ ...formData, judul: e.target.value })}
-              required
               className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
@@ -275,7 +296,6 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
                 type="number"
                 value={formData.tahun}
                 onChange={(e) => setFormData({ ...formData, tahun: parseInt(e.target.value) })}
-                required
                 className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -288,7 +308,6 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
                 type="date"
                 value={formData.tanggalSurat}
                 onChange={(e) => setFormData({ ...formData, tanggalSurat: e.target.value })}
-                required
                 className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -401,7 +420,6 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               placeholder="https://drive.google.com/... atau https://onedrive.live.com/..."
               value={formData.linkCloud}
               onChange={(e) => setFormData({ ...formData, linkCloud: e.target.value })}
-              required
               className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
             />
             <p className="text-xs text-slate-500">
@@ -411,10 +429,11 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
 
           <Button
             type="submit"
+            disabled={isSubmitting}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Simpan Registrasi Arsip
+            {isSubmitting ? "Menyimpan..." : "Simpan Registrasi Arsip"}
           </Button>
         </form>
       </CardContent>
