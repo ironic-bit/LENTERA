@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, createContext, useContext } from "rea
 import type { User, UserRole, AksesKlasifikasi } from "@/types/auth";
 import { hasPermission } from "@/types/auth";
 import { supabase } from "@/supabaseClient";
+import type { Session } from "@supabase/supabase-js";
 
 // ─── Helper: Map Supabase profile row → User interface ────────────────────────
 function mapProfileToUser(
@@ -54,6 +55,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // ─── Auth Provider ────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,82 +68,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initialize: listen to auth state + fetch users
+  // Step 1: Listen to auth state changes (synchronous — no async calls here)
   useEffect(() => {
-    fetchUsers();
-
-    // Supabase Auth listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (session?.user) {
-          const profile = await fetchProfileById(session.user.id, session.user.email);
-          if (profile) {
-            setUser(profile);
-          } else {
-            // Fallback if profile not found yet
-            setUser({
-              id: session.user.id,
-              username: session.user.email?.split("@")[0] || "user",
-              nama: "User Baru",
-              role: "viewer",
-              email: session.user.email,
-              aksesKlasifikasi: ["B"],
-            });
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Error in onAuthStateChange:", err);
-        setUser(null);
-      } finally {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      if (!initialSession) {
         setIsLoading(false);
       }
     });
 
-    // Check initial session (handles page refresh)
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session }, error }) => {
-        if (error || !session) {
-          // If there's an error (e.g. expired/corrupt session), clean up
-          if (error) {
-            localStorage.removeItem("lentera-supabase-auth");
-          }
-          setIsLoading(false);
-          return;
-        }
-        try {
-          const profile = await fetchProfileById(session.user.id, session.user.email);
-          if (profile) {
-            setUser(profile);
-          } else {
-            setUser({
-              id: session.user.id,
-              username: session.user.email?.split("@")[0] || "user",
-              nama: "User Baru",
-              role: "viewer",
-              email: session.user.email,
-              aksesKlasifikasi: ["B"],
-            });
-          }
-        } catch (err) {
-          console.error("Error fetching initial profile:", err);
-        } finally {
-          setIsLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error("Exception getting session:", err);
+    // Listen for changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (!newSession) {
+        setUser(null);
         setIsLoading(false);
-      });
+      }
+    });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchUsers]);
+  }, []);
+
+  // Step 2: When session changes, fetch profile (async operation separated)
+  useEffect(() => {
+    if (!session?.user) {
+      // No session = no user, loading done
+      if (!isLoading) return; // avoid re-setting if already done
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchProfileById(session.user.id, session.user.email);
+        if (cancelled) return;
+
+        if (profile) {
+          setUser(profile);
+        } else {
+          setUser({
+            id: session.user.id,
+            username: session.user.email?.split("@")[0] || "user",
+            nama: "User Baru",
+            role: "viewer",
+            email: session.user.email,
+            aksesKlasifikasi: ["B"],
+          });
+        }
+      } catch (err) {
+        console.error("Error loading profile:", err);
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    loadProfile();
+    fetchUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, fetchUsers]);
 
   // ─── Login ────────────────────────────────────────────────────────────────────
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
@@ -165,41 +159,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         emailToUse = profiles[0].email;
       }
 
-      // Sign in with Supabase Auth
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      // Sign in with Supabase Auth — this will trigger onAuthStateChange
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: emailToUse,
         password,
       });
 
-      if (signInError || !authData.user) {
-        console.error("Login failed:", signInError?.message);
+      if (signInError) {
+        console.error("Login failed:", signInError.message);
         setIsLoading(false);
         return false;
       }
 
-      // Fetch profile and verify status
-      const profile = await fetchProfileById(authData.user.id, authData.user.email);
-
-      if (profile) {
-        if (profile.statusAktif === false) {
-          await supabase.auth.signOut();
-          setUser(null);
-          setIsLoading(false);
-          return false;
-        }
-        setUser(profile);
-      } else {
-        setUser({
-          id: authData.user.id,
-          username: authData.user.email?.split("@")[0] || "user",
-          nama: "User Baru",
-          role: "viewer",
-          email: authData.user.email,
-          aksesKlasifikasi: ["B"],
-        });
-      }
-
-      setIsLoading(false);
+      // onAuthStateChange will handle setting the session and user
       return true;
     } catch (err) {
       console.error("Login exception:", err);
@@ -210,15 +182,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Logout ───────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("Logout error:", err);
-    }
-    // Force clear session from localStorage to prevent stale session on next login
-    localStorage.removeItem("lentera-supabase-auth");
-    setUser(null);
-    setIsLoading(false);
+    await supabase.auth.signOut();
+    // onAuthStateChange will set session to null → user to null
   }, []);
 
   // ─── User CRUD (Admin operations via Edge Functions) ──────────────────────────
@@ -251,7 +216,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Refresh user list from database
       await fetchUsers();
       return true;
     },
@@ -260,7 +224,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const deleteUser = useCallback(
     async (id: string): Promise<boolean> => {
-      // Prevent deleting self
       if (user?.id === id) return false;
 
       const token = await getAuthToken();
@@ -276,7 +239,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Refresh user list from database
       await fetchUsers();
       return true;
     },
@@ -288,7 +250,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await getAuthToken();
       if (!token) return false;
 
-      // If updating own password, use Supabase client directly
       if (partialData.password && user?.id === id) {
         const { error: pwError } = await supabase.auth.updateUser({
           password: partialData.password,
@@ -299,13 +260,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // For updating another user (or profile fields), use the Edge Function
       const { data, error } = await supabase.functions.invoke("update-user", {
         headers: { Authorization: `Bearer ${token}` },
         body: {
           userId: id,
           email: partialData.email,
-          password: user?.id !== id ? partialData.password : undefined, // Only send password to EF for other users
+          password: user?.id !== id ? partialData.password : undefined,
           username: partialData.username,
           nama: partialData.nama,
           role: partialData.role,
@@ -319,7 +279,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      // Refresh user list and current user profile
       await fetchUsers();
       if (user?.id === id) {
         const updatedProfile = await fetchProfileById(id, user.email);
