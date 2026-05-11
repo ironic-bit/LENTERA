@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+const MODEL = "@cf/llava-hf/llava-1.5-7b-hf";
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -28,13 +28,6 @@ serve(async (req: Request) => {
       "Authorization": `Bearer ${cfApiToken}`,
       "Content-Type": "application/json",
     };
-
-    // Step 0: Auto-agree to model license (idempotent, safe to call every time)
-    await fetch(cfBaseUrl, {
-      method: "POST",
-      headers: cfHeaders,
-      body: JSON.stringify({ messages: [{ role: "user", content: "agree" }] }),
-    });
 
     // Accept multipart form data with an image file
     const formData = await req.formData();
