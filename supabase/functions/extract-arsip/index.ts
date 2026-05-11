@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -20,6 +22,19 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const cfBaseUrl = `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/${MODEL}`;
+    const cfHeaders = {
+      "Authorization": `Bearer ${cfApiToken}`,
+      "Content-Type": "application/json",
+    };
+
+    // Step 0: Auto-agree to model license (idempotent, safe to call every time)
+    await fetch(cfBaseUrl, {
+      method: "POST",
+      headers: cfHeaders,
+      body: JSON.stringify({ messages: [{ role: "user", content: "agree" }] }),
+    });
 
     // Accept multipart form data with an image file
     const formData = await req.formData();
@@ -44,23 +59,18 @@ serve(async (req: Request) => {
     base64 = btoa(base64);
     const mimeType = file.type || "image/jpeg";
 
-    // Call Cloudflare Workers AI - Kimi K2.5 (free, supports vision)
-    const cfResponse = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/llava-hf/llava-1.5-7b-hf`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${cfApiToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan dokumen arsip pemerintah daerah Indonesia.
+    // Call Cloudflare Workers AI - Llama 3.2 Vision (free)
+    const cfResponse = await fetch(cfBaseUrl, {
+      method: "POST",
+      headers: cfHeaders,
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan dokumen arsip pemerintah daerah Indonesia.
 Dokumen bisa berupa: surat dinas, keputusan, peraturan, nota dinas, laporan, berita acara, MoU, kontrak, SK, proposal, notulen rapat, undangan, disposisi, sertifikat, piagam, SOP, atau dokumen resmi lainnya.
 
 Ekstrak informasi berikut dari gambar dokumen yang diberikan. Jika tidak ditemukan, kosongkan saja ("").
@@ -75,21 +85,20 @@ Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan 
   "deskripsi": "ringkasan singkat isi/substansi dokumen dalam 1-2 kalimat",
   "klasifikasiKeamanan": "salah satu dari: B (Biasa/Terbuka), T (Terbatas), R (Rahasia), SR (Sangat Rahasia) - default B jika tidak ada marking keamanan"
 }`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64}`,
                 },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64}`,
-                  },
-                },
-              ],
-            },
-          ],
-          max_tokens: 1000,
-          temperature: 0.1,
-        }),
-      }
-    );
+              },
+            ],
+          },
+        ],
+        max_tokens: 1000,
+        temperature: 0.1,
+      }),
+    });
 
     if (!cfResponse.ok) {
       const errorText = await cfResponse.text();
