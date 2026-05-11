@@ -18,7 +18,7 @@ type AppView = "homepage" | "login" | "dashboard" | "manajemen_user";
 
 function AppContent() {
   const [view, setView] = useState<AppView>("homepage");
-  const { arsipList, isLoaded, addArsip, deleteArsip } = useArsip();
+  const { arsipList, addArsip, deleteArsip } = useArsip();
   const { isAuthenticated, isLoading, userRole } = useAuth();
 
   // Auto-redirect: when authenticated, go to dashboard. When not, go to homepage.
