@@ -97,8 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Step 2: When session changes, fetch profile (async operation separated)
   useEffect(() => {
     if (!session?.user) {
-      // No session = no user, loading done
-      if (!isLoading) return; // avoid re-setting if already done
+      setUser(null);
+      setIsLoading(false);
       return;
     }
 
