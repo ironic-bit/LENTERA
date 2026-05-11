@@ -11,9 +11,11 @@ serve(async (req: Request) => {
   }
 
   try {
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured" }), {
+    const cfAccountId = Deno.env.get("CF_ACCOUNT_ID");
+    const cfApiToken = Deno.env.get("CF_API_TOKEN");
+
+    if (!cfAccountId || !cfApiToken) {
+      return new Response(JSON.stringify({ error: "Cloudflare credentials not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -30,7 +32,7 @@ serve(async (req: Request) => {
       });
     }
 
-    // Convert file to base64 (chunk-based to avoid stack overflow on large files)
+    // Convert file to base64 (chunk-based to avoid stack overflow)
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
     let base64 = "";
@@ -42,17 +44,22 @@ serve(async (req: Request) => {
     base64 = btoa(base64);
     const mimeType = file.type || "image/jpeg";
 
-    // Call Google Gemini API (free tier: 15 req/min, 1500/day)
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+    // Call Cloudflare Workers AI - Kimi K2.5 (free, supports vision)
+    const cfResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/moonshotai/kimi-k2.5`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${cfApiToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [
+          messages: [
             {
-              parts: [
+              role: "user",
+              content: [
                 {
+                  type: "text",
                   text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan dokumen arsip pemerintah daerah Indonesia.
 Dokumen bisa berupa: surat dinas, keputusan, peraturan, nota dinas, laporan, berita acara, MoU, kontrak, SK, proposal, notulen rapat, undangan, disposisi, sertifikat, piagam, SOP, atau dokumen resmi lainnya.
 
@@ -70,42 +77,39 @@ Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan 
 }`
                 },
                 {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64,
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64}`,
                   },
                 },
               ],
             },
           ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1000,
-          },
+          max_tokens: 1000,
+          temperature: 0.1,
         }),
       }
     );
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API Error:", errorText);
+    if (!cfResponse.ok) {
+      const errorText = await cfResponse.text();
+      console.error("Cloudflare AI Error:", errorText);
       return new Response(JSON.stringify({ error: "AI processing failed", details: errorText }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const geminiData = await geminiResponse.json();
-    const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const cfData = await cfResponse.json();
+    const content = cfData.result?.response || "";
 
-    // Parse the JSON response from Gemini
+    // Parse the JSON response
     let extractedData;
     try {
-      // Remove markdown code fences if present
       const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       extractedData = JSON.parse(cleanContent);
     } catch {
-      console.error("Failed to parse Gemini response:", content);
+      console.error("Failed to parse AI response:", content);
       return new Response(JSON.stringify({ error: "Failed to parse AI response", raw: content }), {
         status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
