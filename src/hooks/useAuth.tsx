@@ -106,6 +106,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .getSession()
       .then(async ({ data: { session }, error }) => {
         if (error || !session) {
+          // If there's an error (e.g. expired/corrupt session), clean up
+          if (error) {
+            localStorage.removeItem("lentera-supabase-auth");
+          }
           setIsLoading(false);
           return;
         }
@@ -206,7 +210,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Logout ───────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    // Force clear session from localStorage to prevent stale session on next login
+    localStorage.removeItem("lentera-supabase-auth");
     setUser(null);
     setIsLoading(false);
   }, []);
