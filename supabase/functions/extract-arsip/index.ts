@@ -40,56 +40,32 @@ serve(async (req: Request) => {
       });
     }
 
-    // Convert file to base64 (chunk-based to avoid stack overflow)
+    // Convert file to raw bytes array (LLaVA expects image as number array)
     const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    let base64 = "";
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      base64 += String.fromCharCode(...chunk);
-    }
-    base64 = btoa(base64);
-    const mimeType = file.type || "image/jpeg";
+    const imageArray = Array.from(new Uint8Array(arrayBuffer));
 
-    // Call Cloudflare Workers AI - Llama 3.2 Vision (free)
+    // Call Cloudflare Workers AI - LLaVA 1.5 (free, no agreement needed)
+    // LLaVA uses { image, prompt } format, NOT messages format
     const cfResponse = await fetch(cfBaseUrl, {
       method: "POST",
       headers: cfHeaders,
       body: JSON.stringify({
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Kamu adalah asisten yang mengekstrak metadata dari foto/scan dokumen arsip pemerintah daerah Indonesia.
-Dokumen bisa berupa: surat dinas, keputusan, peraturan, nota dinas, laporan, berita acara, MoU, kontrak, SK, proposal, notulen rapat, undangan, disposisi, sertifikat, piagam, SOP, atau dokumen resmi lainnya.
+        image: imageArray,
+        prompt: `Extract metadata from this document image. The document is an Indonesian government archive (surat dinas, keputusan, peraturan, nota dinas, laporan, berita acara, SK, etc).
 
-Ekstrak informasi berikut dari gambar dokumen yang diberikan. Jika tidak ditemukan, kosongkan saja ("").
-
-Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan field berikut:
+Return ONLY valid JSON with these fields:
 {
-  "nomorSurat": "nomor dokumen/surat/SK/keputusan lengkap",
-  "judul": "perihal/judul/tentang dari dokumen",
-  "jenisNaskah": "salah satu dari: Surat Masuk, Surat Keluar, Keputusan, Peraturan, Nota Dinas, Memo, Disposisi, Surat Perintah, Surat Tugas, Surat Perjalanan Dinas, Surat Edaran, Surat Kuasa, Berita Acara, Surat Keterangan, Surat Pengantar, Pengumuman, Laporan, Telaahan Staf, Notula, Surat Undangan, Surat Izin, Rekomendasi, Sertifikat, Piagam, Surat Perjanjian, SOP, Lainnya",
-  "tanggalSurat": "tanggal dokumen dalam format YYYY-MM-DD",
-  "tahun": angka tahun dokumen (number),
-  "deskripsi": "ringkasan singkat isi/substansi dokumen dalam 1-2 kalimat",
-  "klasifikasiKeamanan": "salah satu dari: B (Biasa/Terbuka), T (Terbatas), R (Rahasia), SR (Sangat Rahasia) - default B jika tidak ada marking keamanan"
-}`
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 1000,
-        temperature: 0.1,
+  "nomorSurat": "document number",
+  "judul": "subject/title",
+  "jenisNaskah": "one of: Surat Masuk, Surat Keluar, Keputusan, Peraturan, Nota Dinas, Memo, Disposisi, Surat Perintah, Surat Tugas, Surat Edaran, Berita Acara, Surat Keterangan, Pengumuman, Laporan, Notula, Surat Undangan, Surat Izin, Sertifikat, SOP, Lainnya",
+  "tanggalSurat": "date in YYYY-MM-DD format",
+  "tahun": year as number,
+  "deskripsi": "brief description in 1-2 sentences",
+  "klasifikasiKeamanan": "B"
+}
+
+If a field cannot be found, use empty string "". Return ONLY the JSON, no explanation.`,
+        max_tokens: 512,
       }),
     });
 
@@ -103,13 +79,18 @@ Berikan output dalam format JSON SAJA (tanpa markdown, tanpa penjelasan) dengan 
     }
 
     const cfData = await cfResponse.json();
-    const content = cfData.result?.response || "";
+    const content = cfData.result?.description || cfData.result?.response || "";
 
     // Parse the JSON response
     let extractedData;
     try {
-      const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      extractedData = JSON.parse(cleanContent);
+      // Try to find JSON in the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        extractedData = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
     } catch {
       console.error("Failed to parse AI response:", content);
       return new Response(JSON.stringify({ error: "Failed to parse AI response", raw: content }), {
