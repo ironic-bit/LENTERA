@@ -46,7 +46,7 @@ serve(async (req: Request) => {
 
     // Call Cloudflare Workers AI - Kimi K2.5 (free, supports vision)
     const cfResponse = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/meta/llama-3.2-11b-vision-instruct`,
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/llava-hf/llava-1.5-7b-hf`,
       {
         method: "POST",
         headers: {
