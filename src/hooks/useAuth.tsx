@@ -94,9 +94,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Step 2: When session changes, fetch profile (async operation separated)
+  // Step 2: When session user changes, fetch profile
+  const sessionUserId = session?.user?.id || null;
+  const sessionUserEmail = session?.user?.email || null;
+
   useEffect(() => {
-    if (!session?.user) {
+    if (!sessionUserId) {
       setUser(null);
       setIsLoading(false);
       return;
@@ -106,18 +109,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const loadProfile = async () => {
       try {
-        const profile = await fetchProfileById(session.user.id, session.user.email);
+        const profile = await fetchProfileById(sessionUserId, sessionUserEmail || undefined);
         if (cancelled) return;
 
         if (profile) {
           setUser(profile);
         } else {
           setUser({
-            id: session.user.id,
-            username: session.user.email?.split("@")[0] || "user",
+            id: sessionUserId,
+            username: sessionUserEmail?.split("@")[0] || "user",
             nama: "User Baru",
             role: "viewer",
-            email: session.user.email,
+            email: sessionUserEmail || undefined,
             aksesKlasifikasi: ["B"],
           });
         }
@@ -135,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [session, fetchUsers]);
+  }, [sessionUserId, sessionUserEmail, fetchUsers]);
 
   // ─── Login ────────────────────────────────────────────────────────────────────
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
