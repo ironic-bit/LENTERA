@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { FormRegistrasi } from "@/components/FormRegistrasi";
@@ -20,6 +20,16 @@ function AppContent() {
   const [view, setView] = useState<AppView>("homepage");
   const { arsipList, isLoaded, addArsip, deleteArsip } = useArsip();
   const { isAuthenticated, isLoading, userRole } = useAuth();
+
+  // Auto-redirect: when authenticated, go to dashboard. When not, go to homepage.
+  useEffect(() => {
+    if (isAuthenticated && (view === "login" || view === "homepage")) {
+      setView("dashboard");
+    }
+    if (!isAuthenticated && !isLoading && view !== "homepage" && view !== "login") {
+      setView("homepage");
+    }
+  }, [isAuthenticated, isLoading, view]);
 
   const handleLoginClick = () => {
     setView("login");
@@ -54,6 +64,17 @@ function AppContent() {
     }
   };
 
+  // Show loading while auth state is being determined
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-pulse text-blue-600 font-medium">
+          Memuat sistem...
+        </div>
+      </div>
+    );
+  }
+
   // Show homepage
   if (view === "homepage" && !isAuthenticated) {
     return <Homepage onLoginClick={handleLoginClick} />;
@@ -74,40 +95,9 @@ function AppContent() {
     );
   }
 
-  // Ensure that if we are authenticated, we don't accidentally stay stuck on a 'login' or 'homepage' view internally
-  if (isAuthenticated && (view === "login" || view === "homepage")) {
-    setView("dashboard");
-    return null;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-pulse text-blue-600 font-medium">
-          Memuat sistem...
-        </div>
-      </div>
-    );
-  }
-
-  if (!isLoaded && isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-pulse text-blue-600 font-medium">
-          Memuat data arsip...
-        </div>
-      </div>
-    );
-  }
-
-  // If we reach here and are not authenticated (e.g. after logout), redirect to homepage/login
+  // Not authenticated and not on login/homepage (shouldn't happen, but safety)
   if (!isAuthenticated) {
-    if (view !== "homepage" && view !== "login") {
-      // Saat logout, kita kembali ke homepage saja agar tidak stuck di form login
-      setView("homepage");
-    }
-    // Render nothing while state updates
-    return null;
+    return <Homepage onLoginClick={handleLoginClick} />;
   }
 
   return (
