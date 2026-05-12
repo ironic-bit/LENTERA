@@ -71,32 +71,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchUsers();
 
     // Supabase Auth listener
+    // IMPORTANT: Do NOT await Supabase calls directly inside onAuthStateChange.
+    // Doing so causes a deadlock in supabase/auth-js (see issue #762).
+    // Use setTimeout(0) to defer async work outside the internal auth lock.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (session?.user) {
-          const profile = await fetchProfileById(session.user.id, session.user.email);
-          if (profile) {
-            setUser(profile);
-          } else {
-            // Fallback if profile not found yet
-            setUser({
-              id: session.user.id,
-              username: session.user.email?.split("@")[0] || "user",
-              nama: "User Baru",
-              role: "viewer",
-              email: session.user.email,
-              aksesKlasifikasi: ["B"],
-            });
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        // Defer the async profile fetch to avoid deadlock
+        setTimeout(async () => {
+          try {
+            const profile = await fetchProfileById(session.user.id, session.user.email);
+            if (profile) {
+              setUser(profile);
+            } else {
+              setUser({
+                id: session.user.id,
+                username: session.user.email?.split("@")[0] || "user",
+                nama: "User Baru",
+                role: "viewer",
+                email: session.user.email,
+                aksesKlasifikasi: ["B"],
+              });
+            }
+          } catch (err) {
+            console.error("Error in onAuthStateChange:", err);
+            setUser(null);
+          } finally {
+            setIsLoading(false);
           }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error("Error in onAuthStateChange:", err);
+        }, 0);
+      } else {
         setUser(null);
-      } finally {
         setIsLoading(false);
       }
     });
@@ -150,10 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let emailToUse = normalizedIdentifier;
 
     try {
-      // Clear any stale/corrupt session before attempting a fresh login.
-      // This prevents the scenario where a previous logout left residual session
-      // data that interferes with the new signInWithPassword call.
-      await supabase.auth.signOut({ scope: 'local' });
+      // Clear any stale/corrupt session data before attempting a fresh login.
+      // Only remove localStorage — do NOT call signOut() here because it triggers
+      // onAuthStateChange which can race with the new login.
       localStorage.removeItem("lentera-supabase-auth");
 
       // Resolve username/NIP to email if not already an email
