@@ -30,6 +30,120 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/supabaseClient";
 import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as pdfjsLib from "pdfjs-dist";
+
+// Set PDF.js worker source
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+/**
+ * Convert the first page of a PDF file to a PNG image blob.
+ * Renders at 2x scale for good OCR quality via the vision model.
+ */
+async function pdfToImage(pdfFile: File): Promise<Blob> {
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+
+  // Render at 2x scale for better text readability
+  const scale = 2;
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d")!;
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Failed to convert PDF page to image"));
+      },
+      "image/png",
+      0.95
+    );
+  });
+}
+
+/**
+ * Auto-suggest kodeKlasifikasi based on keywords in judul and deskripsi.
+ * Returns the best matching kode or empty string if no match found.
+ */
+function suggestKodeKlasifikasi(judul: string, deskripsi: string, jenisNaskah: string): string {
+  const text = `${judul} ${deskripsi} ${jenisNaskah}`.toLowerCase();
+
+  // Keyword mapping to kode klasifikasi (ordered by specificity)
+  const rules: Array<{ keywords: string[]; kode: string }> = [
+    // Perjalanan Dinas
+    { keywords: ["perjalanan dinas", "sppd", "perdin"], kode: "000.1.2.3" },
+    { keywords: ["perjalanan dinas luar negeri"], kode: "000.1.3.3" },
+    // Telekomunikasi / IT
+    { keywords: ["telekomunikasi", "telepon", "internet", "jaringan", "wifi"], kode: "000.1.1" },
+    { keywords: ["listrik", "air", "komputer", "jaringan"], kode: "000.1.9" },
+    // Rapat
+    { keywords: ["rapat", "rapat pimpinan", "notulen", "notula"], kode: "000.1.5" },
+    // Kendaraan
+    { keywords: ["kendaraan dinas", "mobil dinas", "kendaraan"], kode: "000.1.7" },
+    // Gedung / Pemeliharaan
+    { keywords: ["gedung", "pemeliharaan", "rehabilitasi", "taman", "peralatan kantor"], kode: "000.1.8" },
+    // Ketertiban & Keamanan
+    { keywords: ["ketertiban", "keamanan", "satpam", "security"], kode: "000.1.10" },
+    // Parkir
+    { keywords: ["parkir"], kode: "000.1.11" },
+    // Pakaian Dinas
+    { keywords: ["pakaian dinas", "seragam"], kode: "000.1.12" },
+    // Perlengkapan
+    { keywords: ["perlengkapan", "inventaris", "barang milik daerah", "bmd", "aset"], kode: "000.2" },
+    // Pengadaan
+    { keywords: ["pengadaan", "lelang", "tender", "kontrak", "adendum", "pbj"], kode: "000.3" },
+    // Perpustakaan
+    { keywords: ["perpustakaan", "buku", "literasi"], kode: "000.4" },
+    // Kearsipan
+    { keywords: ["arsip", "kearsipan", "retensi", "penyusutan", "alih media"], kode: "000.5" },
+    // Persandian
+    { keywords: ["persandian", "sandi", "siber", "keamanan informasi"], kode: "000.6" },
+    // Perencanaan
+    { keywords: ["perencanaan", "rpjmd", "rkpd", "renstra", "renja", "musrenbang"], kode: "000.7" },
+    // Organisasi
+    { keywords: ["organisasi", "tata laksana", "sotk", "tupoksi", "anjab", "abk"], kode: "000.8" },
+    // Penelitian
+    { keywords: ["penelitian", "pengkajian", "pengembangan", "litbang"], kode: "000.9" },
+    // Otonomi Daerah
+    { keywords: ["otonomi daerah", "desentralisasi", "daerah otonom"], kode: "100.1" },
+    // Pemerintahan Umum
+    { keywords: ["pemerintahan umum", "administrasi pemerintahan", "gubernur", "walikota", "bupati"], kode: "100.2" },
+    // Hukum
+    { keywords: ["hukum", "perda", "perkada", "peraturan", "keputusan", "sk", "legal"], kode: "100.3" },
+    // Politik
+    { keywords: ["politik", "kesatuan bangsa", "kesbangpol"], kode: "200.1" },
+    { keywords: ["pemilu", "pilkada", "pemilihan"], kode: "200.2" },
+    // Fasilitas Kantor
+    { keywords: ["fasilitas kantor", "ruang rapat", "ruangan"], kode: "000.1.4" },
+    // Konsumsi
+    { keywords: ["konsumsi", "makan minum", "jamuan"], kode: "000.1.6" },
+  ];
+
+  // Find best match (most keywords matched)
+  let bestMatch = "";
+  let bestScore = 0;
+
+  for (const rule of rules) {
+    let score = 0;
+    for (const keyword of rule.keywords) {
+      if (text.includes(keyword)) {
+        score += keyword.length; // Longer keyword matches = higher confidence
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = rule.kode;
+    }
+  }
+
+  return bestMatch;
+}
 
 interface FormRegistrasiProps {
   onSubmit: (arsip: Omit<Arsip, "id" | "tanggalRegistrasi">) => Promise<boolean>;
@@ -60,7 +174,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
   const [isExtracting, setIsExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle AI extraction from uploaded image
+  // Handle AI extraction from uploaded image or PDF
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -88,9 +202,25 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
         return;
       }
 
-      // Send file to Edge Function
+      // If PDF, convert first page to image on the frontend
+      let fileToUpload: File | Blob = file;
+      let fileName = file.name;
+
+      if (file.type === "application/pdf") {
+        try {
+          const imageBlob = await pdfToImage(file);
+          fileToUpload = imageBlob;
+          fileName = file.name.replace(/\.pdf$/i, ".png");
+        } catch (pdfErr) {
+          console.error("PDF to image conversion failed:", pdfErr);
+          alert("Gagal memproses PDF. Pastikan file PDF valid dan tidak corrupt.");
+          return;
+        }
+      }
+
+      // Send file (image) to Edge Function
       const formDataUpload = new FormData();
-      formDataUpload.append("file", file);
+      formDataUpload.append("file", fileToUpload, fileName);
 
       const { data, error } = await supabase.functions.invoke("extract-arsip", {
         headers: { Authorization: `Bearer ${token}` },
@@ -106,20 +236,32 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
       const extracted = data.data;
 
       // Auto-fill form fields with extracted data
+      const newJudul = extracted.judul || formData.judul;
+      const newDeskripsi = extracted.deskripsi || formData.deskripsi;
+      const newJenisNaskah = extracted.jenisNaskah || formData.jenisNaskah;
+
+      // Auto-suggest kodeKlasifikasi based on extracted metadata
+      const suggestedKode = suggestKodeKlasifikasi(newJudul, newDeskripsi, newJenisNaskah);
+
       setFormData((prev) => ({
         ...prev,
         nomorSurat: extracted.nomorSurat || prev.nomorSurat,
-        judul: extracted.judul || prev.judul,
-        jenisNaskah: extracted.jenisNaskah || prev.jenisNaskah,
+        judul: newJudul,
+        jenisNaskah: newJenisNaskah,
         tanggalSurat: extracted.tanggalSurat || prev.tanggalSurat,
         tahun: extracted.tahun || prev.tahun,
-        deskripsi: extracted.deskripsi || prev.deskripsi,
+        deskripsi: newDeskripsi,
         klasifikasiKeamanan: (["B", "T", "R", "SR"].includes(extracted.klasifikasiKeamanan) 
           ? extracted.klasifikasiKeamanan 
           : prev.klasifikasiKeamanan) as "SR" | "R" | "T" | "B",
+        // Only auto-fill kodeKlasifikasi if not already set
+        kodeKlasifikasi: prev.kodeKlasifikasi || suggestedKode,
       }));
 
-      alert("Data berhasil diekstrak dari dokumen! Periksa dan lengkapi field yang kosong.");
+      const kodeInfo = suggestedKode 
+        ? `\nKode Klasifikasi disarankan: ${suggestedKode} (${KODE_KLASIFIKASI.find(k => k.kode === suggestedKode)?.nama || ""})`
+        : "";
+      alert(`Data berhasil diekstrak dari dokumen! Periksa dan lengkapi field yang kosong.${kodeInfo}`);
     } catch (err) {
       console.error("Upload error:", err);
       alert("Terjadi kesalahan saat memproses file.");
@@ -230,7 +372,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               <h4 className="text-sm font-semibold text-purple-800">AI Auto-Fill</h4>
             </div>
             <p className="text-xs text-purple-600 mb-3">
-              Upload foto/scan dokumen arsip untuk mengisi form otomatis menggunakan AI
+              Upload foto/scan dokumen atau file PDF untuk mengisi form otomatis menggunakan AI
             </p>
             <input
               ref={fileInputRef}
@@ -255,7 +397,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               ) : (
                 <>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Foto Dokumen
+                  Upload Foto/PDF Dokumen
                 </>
               )}
             </Button>
