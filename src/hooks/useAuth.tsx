@@ -150,6 +150,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let emailToUse = normalizedIdentifier;
 
     try {
+      // Clear any stale/corrupt session before attempting a fresh login.
+      // This prevents the scenario where a previous logout left residual session
+      // data that interferes with the new signInWithPassword call.
+      await supabase.auth.signOut({ scope: 'local' });
+      localStorage.removeItem("lentera-supabase-auth");
+
       // Resolve username/NIP to email if not already an email
       if (!normalizedIdentifier.includes("@")) {
         const { data: profiles, error } = await supabase
@@ -210,15 +216,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Logout ───────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
+    // Clear user state immediately to update UI
+    setUser(null);
+    setIsLoading(false);
+
     try {
-      await supabase.auth.signOut();
+      // Use scope: 'local' to only clear local session without calling the server.
+      // This prevents issues where server-side revocation fails and leaves a corrupt
+      // local session that blocks subsequent logins.
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (err) {
       console.error("Logout error:", err);
     }
-    // Force clear session from localStorage to prevent stale session on next login
+
+    // Ensure localStorage is clean even if signOut had issues
     localStorage.removeItem("lentera-supabase-auth");
-    setUser(null);
-    setIsLoading(false);
   }, []);
 
   // ─── User CRUD (Admin operations via Edge Functions) ──────────────────────────
