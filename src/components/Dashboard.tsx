@@ -9,7 +9,6 @@ import {
   FileText,
   ShieldCheck,
   Clock3,
-  ChevronRight,
   LayoutDashboard,
   Settings,
   Users,
@@ -274,11 +273,11 @@ function UploadPanel({ onUploadSuccess }: { onUploadSuccess: () => void }) {
             <h4 className="text-sm font-semibold text-emerald-800">Hasil Ekstraksi AI</h4>
           </div>
           <div className="grid gap-2 text-sm">
-            {result.nomorSurat && <p><span className="text-slate-500">Nomor:</span> <span className="font-medium">{result.nomorSurat as string}</span></p>}
-            {result.judul && <p><span className="text-slate-500">Judul:</span> <span className="font-medium">{result.judul as string}</span></p>}
-            {result.kodeKlasifikasi && <p><span className="text-slate-500">Kode:</span> <span className="font-mono font-bold text-blue-700">{result.kodeKlasifikasi as string}</span></p>}
-            {result.jenisNaskah && <p><span className="text-slate-500">Jenis:</span> <span className="font-medium">{result.jenisNaskah as string}</span></p>}
-            {result.linkCloud && <p><span className="text-slate-500">Drive:</span> <a href={result.linkCloud as string} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Buka file</a></p>}
+            {result.nomorSurat && <p><span className="text-slate-500">Nomor:</span> <span className="font-medium">{String(result.nomorSurat)}</span></p>}
+            {result.judul && <p><span className="text-slate-500">Judul:</span> <span className="font-medium">{String(result.judul)}</span></p>}
+            {result.kodeKlasifikasi && <p><span className="text-slate-500">Kode:</span> <span className="font-mono font-bold text-blue-700">{String(result.kodeKlasifikasi)}</span></p>}
+            {result.jenisNaskah && <p><span className="text-slate-500">Jenis:</span> <span className="font-medium">{String(result.jenisNaskah)}</span></p>}
+            {result.linkCloud && <p><span className="text-slate-500">Drive:</span> <a href={String(result.linkCloud)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Buka file</a></p>}
           </div>
         </div>
       )}

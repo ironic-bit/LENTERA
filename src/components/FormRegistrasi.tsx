@@ -28,7 +28,7 @@ import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/supabaseClient";
-import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Sparkles, Loader2, Bot } from "lucide-react";
+import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Loader2, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
