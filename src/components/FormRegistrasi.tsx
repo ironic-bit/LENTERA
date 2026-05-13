@@ -28,7 +28,7 @@ import type { Arsip } from "@/types/arsip";
 import { KODE_KLASIFIKASI, JENIS_NASKAH, KLASIFIKASI_KEAMANAN, KETERANGAN_RETENSI, STATUS_ARSIP } from "@/types/arsip";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/supabaseClient";
-import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Cloud, Lock, Shield, FileText, Check, ChevronsUpDown, Upload, Sparkles, Loader2, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FormRegistrasiProps {
@@ -72,9 +72,9 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
       return;
     }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Ukuran file terlalu besar. Maksimal 10MB.");
+    // Validate file size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      alert("Ukuran file terlalu besar. Maksimal 20MB.");
       return;
     }
 
@@ -88,11 +88,12 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
         return;
       }
 
-      // Send file to Edge Function
+      // Send file to process-arsip Edge Function (Gemini + Google Drive)
       const formDataUpload = new FormData();
       formDataUpload.append("file", file);
+      formDataUpload.append("opd", "Dinas-PUPR");
 
-      const { data, error } = await supabase.functions.invoke("extract-arsip", {
+      const { data, error } = await supabase.functions.invoke("process-arsip", {
         headers: { Authorization: `Bearer ${token}` },
         body: formDataUpload,
       });
@@ -105,7 +106,7 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
 
       const extracted = data.data;
 
-      // Auto-fill form fields with extracted data
+      // Auto-fill form fields with extracted data (including kodeKlasifikasi and linkCloud)
       setFormData((prev) => ({
         ...prev,
         nomorSurat: extracted.nomorSurat || prev.nomorSurat,
@@ -117,9 +118,17 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
         klasifikasiKeamanan: (["B", "T", "R", "SR"].includes(extracted.klasifikasiKeamanan) 
           ? extracted.klasifikasiKeamanan 
           : prev.klasifikasiKeamanan) as "SR" | "R" | "T" | "B",
+        kodeKlasifikasi: extracted.kodeKlasifikasi || prev.kodeKlasifikasi,
+        linkCloud: extracted.linkCloud || prev.linkCloud,
       }));
 
-      alert("Data berhasil diekstrak dari dokumen! Periksa dan lengkapi field yang kosong.");
+      const kodeInfo = extracted.kodeKlasifikasi
+        ? `\nKode Klasifikasi: ${extracted.kodeKlasifikasi}`
+        : "";
+      const driveInfo = extracted.linkCloud
+        ? `\nFile tersimpan di Google Drive.`
+        : "";
+      alert(`Data berhasil diekstrak oleh AI!${kodeInfo}${driveInfo}\n\nPeriksa dan lengkapi field yang kosong.`);
     } catch (err) {
       console.error("Upload error:", err);
       alert("Terjadi kesalahan saat memproses file.");
@@ -226,11 +235,11 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
           {/* AI Auto-Fill Section */}
           <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              <h4 className="text-sm font-semibold text-purple-800">AI Auto-Fill</h4>
+              <Bot className="w-4 h-4 text-purple-600" />
+              <h4 className="text-sm font-semibold text-purple-800">AI Auto-Fill (Gemini)</h4>
             </div>
             <p className="text-xs text-purple-600 mb-3">
-              Upload foto/scan dokumen arsip untuk mengisi form otomatis menggunakan AI
+              Upload foto/scan atau PDF dokumen. AI akan mengekstrak metadata, menentukan kode klasifikasi, dan menyimpan file ke Google Drive otomatis.
             </p>
             <input
               ref={fileInputRef}
@@ -250,12 +259,12 @@ export function FormRegistrasi({ onSubmit }: FormRegistrasiProps) {
               {isExtracting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Mengekstrak data dengan AI...
+                  AI sedang memproses dokumen...
                 </>
               ) : (
                 <>
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Foto Dokumen
+                  Upload Foto/PDF Dokumen
                 </>
               )}
             </Button>
