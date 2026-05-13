@@ -21,7 +21,7 @@ function AppContent() {
   const { arsipList, isLoaded, addArsip, deleteArsip } = useArsip();
   const { isAuthenticated, isLoading, userRole } = useAuth();
 
-  // Handle view transitions based on auth state changes (after logout or login)
+  // Handle view transitions based on auth state changes
   useEffect(() => {
     if (isAuthenticated && (view === "login" || view === "homepage")) {
       setView("dashboard");
@@ -77,7 +77,7 @@ function AppContent() {
           onClick={() => setView("homepage")}
           className="absolute top-4 left-4 text-white/70 hover:text-white flex items-center gap-2"
         >
-          ← Kembali
+          &larr; Kembali
         </button>
       </div>
     );
@@ -103,7 +103,7 @@ function AppContent() {
     );
   }
 
-  // If we reach here and are not authenticated (e.g. after logout), show homepage
+  // If not authenticated, show homepage
   if (!isAuthenticated) {
     return <Homepage onLoginClick={handleLoginClick} />;
   }
