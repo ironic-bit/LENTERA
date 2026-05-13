@@ -195,7 +195,7 @@ async function geminiExtractMetadata(
   fileBase64: string,
   mimeType: string
 ): Promise<Record<string, unknown>> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const prompt = `Kamu adalah arsiparis profesional Dinas PUPR Kota Sungai Penuh yang memahami:
 - Perwako No 49/2022 tentang Klasifikasi Arsip
@@ -266,7 +266,7 @@ async function geminiClassifyKode(
   deskripsi: string,
   jenisNaskah: string
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const prompt = `Kamu adalah arsiparis Kota Sungai Penuh. Berdasarkan informasi dokumen berikut, tentukan KODE KLASIFIKASI yang paling tepat sesuai Perwako No 49/2022.
 
