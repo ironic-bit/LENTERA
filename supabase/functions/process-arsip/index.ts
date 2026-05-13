@@ -402,9 +402,15 @@ serve(async (req: Request) => {
       });
     }
 
-    // Convert file to base64 for Gemini
+    // Convert file to base64 for Gemini (chunked to avoid stack overflow)
     const fileBytes = new Uint8Array(await file.arrayBuffer());
-    const fileBase64 = btoa(String.fromCharCode(...fileBytes));
+    let binary = "";
+    const chunkSize = 8192;
+    for (let i = 0; i < fileBytes.length; i += chunkSize) {
+      const chunk = fileBytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    const fileBase64 = btoa(binary);
 
     // ─── Step 1: Gemini Extract Metadata ───────────────────────────────────
     const extracted = await geminiExtractMetadata(geminiApiKey, fileBase64, file.type);
