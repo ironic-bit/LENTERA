@@ -273,11 +273,11 @@ function UploadPanel({ onUploadSuccess }: { onUploadSuccess: () => void }) {
             <h4 className="text-sm font-semibold text-emerald-800">Hasil Ekstraksi AI</h4>
           </div>
           <div className="grid gap-2 text-sm">
-            {result.nomorSurat && <p><span className="text-slate-500">Nomor:</span> <span className="font-medium">{String(result.nomorSurat)}</span></p>}
-            {result.judul && <p><span className="text-slate-500">Judul:</span> <span className="font-medium">{String(result.judul)}</span></p>}
-            {result.kodeKlasifikasi && <p><span className="text-slate-500">Kode:</span> <span className="font-mono font-bold text-blue-700">{String(result.kodeKlasifikasi)}</span></p>}
-            {result.jenisNaskah && <p><span className="text-slate-500">Jenis:</span> <span className="font-medium">{String(result.jenisNaskah)}</span></p>}
-            {result.linkCloud && <p><span className="text-slate-500">Drive:</span> <a href={String(result.linkCloud)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Buka file</a></p>}
+            {result.nomorSurat ? <p><span className="text-slate-500">Nomor:</span> <span className="font-medium">{String(result.nomorSurat)}</span></p> : null}
+            {result.judul ? <p><span className="text-slate-500">Judul:</span> <span className="font-medium">{String(result.judul)}</span></p> : null}
+            {result.kodeKlasifikasi ? <p><span className="text-slate-500">Kode:</span> <span className="font-mono font-bold text-blue-700">{String(result.kodeKlasifikasi)}</span></p> : null}
+            {result.jenisNaskah ? <p><span className="text-slate-500">Jenis:</span> <span className="font-medium">{String(result.jenisNaskah)}</span></p> : null}
+            {result.linkCloud ? <p><span className="text-slate-500">Drive:</span> <a href={String(result.linkCloud)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Buka file</a></p> : null}
           </div>
         </div>
       )}
