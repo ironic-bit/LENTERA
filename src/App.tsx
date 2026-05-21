@@ -132,17 +132,15 @@ function AppContent() {
               </TabsList>
 
               <TabsContent value="arsip" className="space-y-6">
-                <Tabs defaultValue="daftar" className="space-y-6 lg:hidden">
-                  <TabsList className="grid w-full grid-cols-2 bg-white border border-slate-200 p-1">
+                <Tabs defaultValue="daftar" className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-2 bg-white border border-slate-200 p-1 max-w-md">
                     <TabsTrigger value="daftar" className="flex items-center gap-2">
                       <List className="w-4 h-4" />
-                      <span className="hidden sm:inline">Daftar Arsip</span>
-                      <span className="sm:hidden">Daftar</span>
+                      <span>Daftar Arsip</span>
                     </TabsTrigger>
                     <TabsTrigger value="registrasi" className="flex items-center gap-2">
                       <FormInput className="w-4 h-4" />
-                      <span className="hidden sm:inline">Registrasi Baru</span>
-                      <span className="sm:hidden">Registrasi</span>
+                      <span>Registrasi Baru</span>
                     </TabsTrigger>
                   </TabsList>
 
@@ -156,16 +154,6 @@ function AppContent() {
                     </div>
                   </TabsContent>
                 </Tabs>
-
-                {/* Desktop Layout - Side by Side */}
-                <div className="hidden lg:grid lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-1">
-                    <FormRegistrasi onSubmit={handleAddArsip} />
-                  </div>
-                  <div className="lg:col-span-2">
-                    <DaftarArsip arsipList={arsipList} onDelete={handleDeleteArsip} />
-                  </div>
-                </div>
               </TabsContent>
             </Tabs>
           </>

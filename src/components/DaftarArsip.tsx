@@ -30,6 +30,8 @@ import {
   FolderOpen,
   Shield,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface DaftarArsipProps {
@@ -45,6 +47,8 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
   const [filterKeamanan, setFilterKeamanan] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterTahun, setFilterTahun] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Get unique years from data
   const availableYears = useMemo(() => {
@@ -80,6 +84,18 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
       return canView && matchSearch && matchKeamanan && matchStatus && matchTahun;
     });
   }, [arsipList, searchQuery, filterKeamanan, filterStatus, filterTahun, aksesKlasifikasi]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredArsip.length / itemsPerPage);
+  const paginatedArsip = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredArsip.slice(start, start + itemsPerPage);
+  }, [filteredArsip, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterKeamanan, filterStatus, filterTahun]);
 
   const getKeamananColor = (keamanan: string) => {
     return KLASIFIKASI_KEAMANAN.find((k) => k.value === keamanan)?.color || "bg-slate-100";
@@ -223,9 +239,9 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredArsip.map((arsip, index) => (
+                paginatedArsip.map((arsip, index) => (
                   <TableRow key={arsip.id} className="hover:bg-slate-50">
-                    <TableCell className="text-slate-600">{index + 1}</TableCell>
+                    <TableCell className="text-slate-600">{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
                     <TableCell>
                       <div>
                         <p className="font-mono font-medium text-blue-600 text-sm">{arsip.kodeKlasifikasi}</p>
@@ -309,6 +325,57 @@ export function DaftarArsip({ arsipList, onDelete }: DaftarArsipProps) {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-slate-500">
+              Menampilkan {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredArsip.length)} dari {filteredArsip.length} arsip
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => p - 1)}
+                className="border-slate-300"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Prev
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => {
+                  // Show first, last, current, and neighbors
+                  return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+                })
+                .map((page, idx, arr) => (
+                  <span key={page}>
+                    {idx > 0 && arr[idx - 1] !== page - 1 && (
+                      <span className="text-slate-400 px-1">...</span>
+                    )}
+                    <Button
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className={currentPage === page ? "bg-blue-600 text-white" : "border-slate-300"}
+                    >
+                      {page}
+                    </Button>
+                  </span>
+                ))}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="border-slate-300"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
